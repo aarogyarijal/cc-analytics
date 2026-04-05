@@ -98,14 +98,22 @@ function StatCard({
   trend: number[];
   accent: string;
 }) {
+  const subParts = sub.split(" · ");
+
   return (
-    <div className="h-[146px] min-w-0 rounded-2xl border border-white/10 bg-white/5 p-3 shadow-[0_20px_50px_rgba(2,6,23,0.22)] backdrop-blur-md">
+    <div className="h-[146px] w-max min-w-[220px] rounded-2xl border border-white/10 bg-white/5 p-3 shadow-[0_20px_50px_rgba(2,6,23,0.22)] backdrop-blur-md">
       <div className="flex h-full flex-col justify-between gap-2">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-          <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">{label}</p>
-          <p className="mt-1.5 text-xl font-semibold tracking-tight text-slate-50">{value}</p>
-          <p className="mt-1 text-[11px] leading-tight text-slate-400">{sub}</p>
+            <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">{label}</p>
+            <p className="mt-1.5 text-xl font-semibold tracking-tight text-slate-50">{value}</p>
+            <div className="mt-1 flex flex-wrap gap-x-1.5 gap-y-1 text-[11px] leading-none text-slate-400">
+              {subParts.map((part) => (
+                <span key={part} className="whitespace-nowrap">
+                  {part}
+                </span>
+              ))}
+            </div>
           </div>
           <div className="pt-0.5">
             <Sparkline values={trend} accent={accent} />
@@ -198,7 +206,7 @@ export default function OverviewCards() {
 
   return (
     <section className="space-y-2">
-      <div className="grid grid-flow-col auto-cols-[minmax(0,1fr)] gap-2 overflow-x-auto pb-1">
+      <div className="grid grid-flow-col auto-cols-max gap-2 overflow-x-auto pb-1">
         {cards.map((card) => (
           <div key={card.label}>
             <StatCard {...card} />
