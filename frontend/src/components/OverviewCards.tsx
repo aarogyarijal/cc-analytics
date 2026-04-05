@@ -68,7 +68,10 @@ function StatCard({
   delta: string;
 }) {
   return (
-    <div className="h-[146px] w-fit rounded-2xl border border-white/10 bg-white/5 p-3 shadow-[0_20px_50px_rgba(2,6,23,0.22)] backdrop-blur-md">
+    <div
+      className="h-[146px] rounded-2xl border border-white/10 bg-white/5 p-3 shadow-[0_20px_50px_rgba(2,6,23,0.22)] backdrop-blur-md"
+      style={{ width: "calc(90vw / 6)" }}
+    >
       <div className="flex h-full flex-col justify-between gap-2">
         <div className="w-fit">
           <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">{label}</p>
@@ -147,9 +150,9 @@ export default function OverviewCards() {
 
   return (
     <section className="space-y-2">
-      <div className="grid grid-flow-col auto-cols-max gap-2 overflow-x-auto pb-1">
+      <div className="flex w-[90vw] gap-2 overflow-x-auto pb-1">
         {cards.map((card) => (
-          <div key={card.label}>
+          <div key={card.label} className="shrink-0">
             <StatCard {...card} />
           </div>
         ))}
