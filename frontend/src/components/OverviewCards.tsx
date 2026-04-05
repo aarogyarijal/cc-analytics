@@ -198,12 +198,16 @@ export default function OverviewCards() {
   ];
 
   return (
-    <section className="grid gap-2 md:grid-cols-2 xl:grid-cols-6">
-      {cards.map((card) => (
-        <StatCard key={card.label} {...card} />
-      ))}
+    <section className="space-y-2">
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {cards.map((card) => (
+          <div key={card.label} className="min-w-[210px] flex-1">
+            <StatCard {...card} />
+          </div>
+        ))}
+      </div>
 
-      <div className="md:col-span-2 xl:col-span-6 rounded-2xl border border-cyan-400/15 bg-gradient-to-r from-cyan-400/10 via-slate-950 to-amber-400/10 p-3 shadow-[0_20px_50px_rgba(2,6,23,0.22)] backdrop-blur-md">
+      <div className="rounded-2xl border border-cyan-400/15 bg-gradient-to-r from-cyan-400/10 via-slate-950 to-amber-400/10 p-3 shadow-[0_20px_50px_rgba(2,6,23,0.22)] backdrop-blur-md">
         <div className="flex flex-wrap items-center gap-2">
           <div>
             <p className="text-[11px] uppercase tracking-[0.24em] text-slate-400">Signal summary</p>
