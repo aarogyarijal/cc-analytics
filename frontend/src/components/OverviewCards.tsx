@@ -99,19 +99,21 @@ function StatCard({
   accent: string;
 }) {
   return (
-    <div className="min-w-0 rounded-2xl border border-white/10 bg-white/5 p-3 shadow-[0_20px_50px_rgba(2,6,23,0.22)] backdrop-blur-md">
-      <div className="flex items-start justify-between gap-2">
-        <div>
+    <div className="h-[146px] min-w-0 rounded-2xl border border-white/10 bg-white/5 p-3 shadow-[0_20px_50px_rgba(2,6,23,0.22)] backdrop-blur-md">
+      <div className="flex h-full flex-col justify-between gap-2">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
           <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">{label}</p>
           <p className="mt-1.5 text-xl font-semibold tracking-tight text-slate-50">{value}</p>
           <p className="mt-1 text-[11px] leading-tight text-slate-400">{sub}</p>
+          </div>
+          <div className="pt-0.5">
+            <Sparkline values={trend} accent={accent} />
+          </div>
         </div>
-        <div className="pt-0.5">
-          <Sparkline values={trend} accent={accent} />
+        <div className="inline-flex w-fit rounded-full border border-white/10 bg-black/20 px-2 py-0.5 text-[10px] text-slate-300">
+          {delta}
         </div>
-      </div>
-      <div className="mt-2 inline-flex rounded-full border border-white/10 bg-black/20 px-2 py-0.5 text-[10px] text-slate-300">
-        {delta}
       </div>
     </div>
   );
@@ -196,9 +198,9 @@ export default function OverviewCards() {
 
   return (
     <section className="space-y-2">
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <div className="grid grid-flow-col auto-cols-[minmax(0,1fr)] gap-2 overflow-x-auto pb-1">
         {cards.map((card) => (
-          <div key={card.label} className="min-w-[210px] flex-1">
+          <div key={card.label}>
             <StatCard {...card} />
           </div>
         ))}
