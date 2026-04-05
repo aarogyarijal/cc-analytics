@@ -131,13 +131,10 @@ export default function OverviewCards() {
   });
 
   const today = overview?.today;
-  const latest = daily.at(-1);
   const previous = daily.at(-2);
-  const sevenDays = daily.slice(-7);
 
   const totalTokensToday = (today?.input_tokens ?? 0) + (today?.output_tokens ?? 0);
   const activeSeconds = (today?.active_time_user_s ?? 0) + (today?.active_time_cli_s ?? 0);
-  const costPerSession = (today?.sessions ?? 0) > 0 ? (today?.cost_usd ?? 0) / (today?.sessions ?? 1) : 0;
   const cacheHits = (today?.cache_read_tokens ?? 0) + (today?.cache_creation_tokens ?? 0) > 0
     ? (today?.cache_read_tokens ?? 0) /
       ((today?.input_tokens ?? 0) + (today?.cache_read_tokens ?? 0) + (today?.cache_creation_tokens ?? 0))
@@ -145,50 +142,50 @@ export default function OverviewCards() {
 
   const cards = [
     {
-      label: "Cost today",
+      label: "Cost",
       value: fmtCurrency(today?.cost_usd ?? 0, 4),
-      sub: `All-time ${fmtCurrency(overview?.alltime.cost_usd ?? 0, 2)}`,
-      delta: `vs yesterday ${deltaLabel(today?.cost_usd ?? 0, previous?.cost_usd ?? 0, true)}`,
+      sub: `all ${fmtCurrency(overview?.alltime.cost_usd ?? 0, 2)}`,
+      delta: deltaLabel(today?.cost_usd ?? 0, previous?.cost_usd ?? 0, true),
       trend: daily.map((d) => d.cost_usd),
       accent: "#f59e0b",
     },
     {
-      label: "Tokens today",
+      label: "Tokens",
       value: fmtCompact(totalTokensToday),
       sub: `${fmtCompact(today?.input_tokens ?? 0)} in · ${fmtCompact(today?.output_tokens ?? 0)} out`,
-      delta: `vs yesterday ${deltaLabel(totalTokensToday, (previous?.input_tokens ?? 0) + (previous?.output_tokens ?? 0), true)}`,
+      delta: deltaLabel(totalTokensToday, (previous?.input_tokens ?? 0) + (previous?.output_tokens ?? 0), true),
       trend: daily.map((d) => d.input_tokens + d.output_tokens),
       accent: "#60a5fa",
     },
     {
-      label: "Sessions today",
+      label: "Sessions",
       value: fmtCompact(today?.sessions ?? 0),
-      sub: `All-time ${fmtCompact(overview?.alltime.sessions ?? 0)}`,
-      delta: `vs yesterday ${deltaLabel(today?.sessions ?? 0, previous?.sessions ?? 0, true)}`,
+      sub: `all ${fmtCompact(overview?.alltime.sessions ?? 0)}`,
+      delta: deltaLabel(today?.sessions ?? 0, previous?.sessions ?? 0, true),
       trend: daily.map((d) => d.sessions),
       accent: "#34d399",
     },
     {
-      label: "Active time",
+      label: "Time",
       value: fmtDurationSeconds(activeSeconds),
       sub: `${fmtDurationSeconds(today?.active_time_user_s ?? 0)} typing · ${fmtDurationSeconds(today?.active_time_cli_s ?? 0)} CLI`,
-      delta: "time on task, not idle",
+      delta: "active",
       trend: daily.map((d) => d.active_time_user_s + d.active_time_cli_s),
       accent: "#c084fc",
     },
     {
-      label: "Tool success",
+      label: "Success",
       value: fmtPercent(today?.tool_success_rate ?? 0),
-      sub: `${fmtCompact(today?.api_requests ?? 0)} API requests · ${fmtCompact(today?.api_errors ?? 0)} errors`,
-      delta: `${fmtCompact(overview?.alltime.api_errors ?? 0)} total API errors`,
+      sub: `${fmtCompact(today?.api_requests ?? 0)} req · ${fmtCompact(today?.api_errors ?? 0)} err`,
+      delta: `${fmtCompact(overview?.alltime.api_errors ?? 0)} err`,
       trend: daily.map((d) => (d.api_requests > 0 ? (d.api_requests - d.api_errors) / d.api_requests : 0)),
       accent: "#22c55e",
     },
     {
-      label: "Cache share",
+      label: "Cache",
       value: fmtPercent(cacheHits),
-      sub: `${fmtCompact(today?.cache_read_tokens ?? 0)} cache reads · ${fmtCompact(today?.cache_creation_tokens ?? 0)} cache creates`,
-      delta: `cost/session ${fmtCurrency(costPerSession, 4)}`,
+      sub: `${fmtCompact(today?.cache_read_tokens ?? 0)} read · ${fmtCompact(today?.cache_creation_tokens ?? 0)} create`,
+      delta: "cache",
       trend: daily.map((d) => {
         const total = d.input_tokens + d.cache_read_tokens + d.cache_creation_tokens;
         return total > 0 ? d.cache_read_tokens / total : 0;
@@ -207,50 +204,6 @@ export default function OverviewCards() {
         ))}
       </div>
 
-      <div className="rounded-2xl border border-cyan-400/15 bg-gradient-to-r from-cyan-400/10 via-slate-950 to-amber-400/10 p-3 shadow-[0_20px_50px_rgba(2,6,23,0.22)] backdrop-blur-md">
-        <div className="flex flex-wrap items-center gap-2">
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.24em] text-slate-400">Signal summary</p>
-            <h2 className="mt-1 text-base font-semibold text-slate-50">What the current telemetry says</h2>
-          </div>
-          <div className="ml-auto grid gap-2 sm:grid-cols-3">
-            <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-              <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">7d avg cost</p>
-              <p className="mt-1 text-xs font-semibold text-slate-100">
-                {fmtCurrency(sevenDays.reduce((sum, d) => sum + d.cost_usd, 0) / Math.max(sevenDays.length, 1), 4)}
-              </p>
-            </div>
-            <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-              <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">7d sessions</p>
-              <p className="mt-1 text-xs font-semibold text-slate-100">
-                {fmtCompact(sevenDays.reduce((sum, d) => sum + d.sessions, 0))}
-              </p>
-            </div>
-            <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-              <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">7d active time</p>
-              <p className="mt-1 text-xs font-semibold text-slate-100">
-                {fmtDurationSeconds(
-                  sevenDays.reduce((sum, d) => sum + d.active_time_user_s + d.active_time_cli_s, 0),
-                )}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-300">
-          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
-            {fmtCompact(latest?.lines_of_code ?? 0)} lines changed today
-          </span>
-          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
-            {fmtCompact(today?.commits ?? 0)} commits · {fmtCompact(today?.pull_requests ?? 0)} PRs
-          </span>
-          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
-            {fmtCompact(today?.api_errors ?? 0)} API errors today
-          </span>
-          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
-            {fmtCurrency(costPerSession, 4)} per session
-          </span>
-        </div>
-      </div>
     </section>
   );
 }

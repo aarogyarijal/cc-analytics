@@ -25,12 +25,7 @@ export default function App() {
           <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-5 lg:px-6">
             <div>
               <p className="text-[11px] uppercase tracking-[0.28em] text-slate-500">cc-analytics</p>
-              <h1 className="mt-1 text-lg font-semibold tracking-tight text-slate-50 sm:text-xl">
-                Claude Code Intelligence Dashboard
-              </h1>
-            </div>
-            <div className="hidden rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300 md:block">
-              Operational telemetry, not just totals
+              <h1 className="mt-1 text-lg font-semibold tracking-tight text-slate-50 sm:text-xl">Claude Code</h1>
             </div>
           </div>
         </header>

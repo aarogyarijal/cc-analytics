@@ -33,8 +33,8 @@ export default function ErrorPanel() {
     <section className="rounded-2xl border border-white/10 bg-slate-950/85 p-4 shadow-[0_20px_50px_rgba(2,6,23,0.28)] backdrop-blur-md">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">API errors</p>
-          <h2 className="mt-1 text-lg font-semibold text-slate-50">Failure hotspots and retry pressure</h2>
+          <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Errors</p>
+          <h2 className="mt-1 text-lg font-semibold text-slate-50">API</h2>
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
           <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-300">
@@ -76,7 +76,7 @@ export default function ErrorPanel() {
             {data.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-3 py-6 text-center text-slate-500">
-                  No API errors captured yet
+                  No data
                 </td>
               </tr>
             )}

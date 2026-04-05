@@ -68,12 +68,10 @@ export default function ToolTable() {
     <section className="rounded-2xl border border-white/10 bg-slate-950/85 p-4 shadow-[0_20px_50px_rgba(2,6,23,0.28)] backdrop-blur-md">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Tool quality</p>
-          <h2 className="mt-1 text-lg font-semibold text-slate-50">Reliability and latency by tool</h2>
+          <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Tools</p>
+          <h2 className="mt-1 text-lg font-semibold text-slate-50">Latency</h2>
         </div>
-        <div className="text-xs text-slate-400">
-          Sorted by <span className="text-slate-200">{sortKey}</span>
-        </div>
+        <div className="text-xs text-slate-400">{sortKey}</div>
       </div>
 
       <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-white/5">
@@ -126,7 +124,7 @@ export default function ToolTable() {
             {data.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-3 py-6 text-center text-slate-500">
-                  No tool data yet, start a Claude Code session
+                  No data
                 </td>
               </tr>
             )}

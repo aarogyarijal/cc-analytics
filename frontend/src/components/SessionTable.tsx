@@ -71,10 +71,10 @@ export default function SessionTable() {
     <section className="rounded-2xl border border-white/10 bg-slate-950/85 p-4 shadow-[0_20px_50px_rgba(2,6,23,0.28)] backdrop-blur-md">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Session intelligence</p>
-          <h2 className="mt-1 text-lg font-semibold text-slate-50">Drill into the sessions that cost the most</h2>
+          <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Sessions</p>
+          <h2 className="mt-1 text-lg font-semibold text-slate-50">Costliest</h2>
         </div>
-        <p className="text-xs text-slate-400">Sorted by {sortKey.replace("_", " ")}</p>
+        <p className="text-xs text-slate-400">{sortKey.replace("_", " ")}</p>
       </div>
 
       <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-white/5">
@@ -120,7 +120,7 @@ export default function SessionTable() {
               {data.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-3 py-6 text-center text-slate-500">
-                    No session data yet
+                    No data
                   </td>
                 </tr>
               )}

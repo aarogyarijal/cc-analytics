@@ -66,15 +66,15 @@ export default function EditDecisions() {
     <section className="rounded-2xl border border-white/10 bg-slate-950/85 p-4 shadow-[0_20px_50px_rgba(2,6,23,0.28)] backdrop-blur-md">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Edit behavior</p>
-          <h2 className="mt-1 text-lg font-semibold text-slate-50">Where users accept, reject, or hesitate</h2>
+          <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Edits</p>
+          <h2 className="mt-1 text-lg font-semibold text-slate-50">Accept / reject</h2>
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
           <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-300">
-            {fmtPercent(overallRate)} accepted overall
+            {fmtPercent(overallRate)}
           </span>
           <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-300">
-            {fmtCompact(totalAccept + totalReject)} decisions
+            {fmtCompact(totalAccept + totalReject)}
           </span>
         </div>
       </div>
@@ -83,7 +83,7 @@ export default function EditDecisions() {
         <div className="rounded-xl border border-white/10 bg-white/5 p-2.5">
           <h3 className="mb-2 text-sm font-semibold text-slate-100">By tool</h3>
           {toolData.length === 0 ? (
-            <p className="py-6 text-center text-slate-500">No edit decisions yet</p>
+            <p className="py-6 text-center text-slate-500">No data</p>
           ) : (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={toolData} layout="vertical" margin={{ left: 8, right: 16, top: 6, bottom: 0 }}>
@@ -129,7 +129,7 @@ export default function EditDecisions() {
                 </div>
               </div>
             ))}
-            {languageData.length === 0 && <p className="py-6 text-center text-slate-500">No language data yet</p>}
+            {languageData.length === 0 && <p className="py-6 text-center text-slate-500">No data</p>}
           </div>
         </div>
       </div>

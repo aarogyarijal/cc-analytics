@@ -51,16 +51,16 @@ export default function ModelBreakdown() {
     <section className="rounded-2xl border border-white/10 bg-slate-950/85 p-4 shadow-[0_20px_50px_rgba(2,6,23,0.28)] backdrop-blur-md">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Model intelligence</p>
-          <h2 className="mt-1 text-lg font-semibold text-slate-50">Which model is expensive, efficient, or noisy?</h2>
+          <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Models</p>
+          <h2 className="mt-1 text-lg font-semibold text-slate-50">Cost / efficiency</h2>
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
           <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-300">
-            Total spend {fmtCurrency(totalCost, 2)}
+            Spend {fmtCurrency(totalCost, 2)}
           </span>
           {top && (
             <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-300">
-              Top model {shortId(top.model, 10, 4).replace("claude-", "")}
+              Top {shortId(top.model, 10, 4).replace("claude-", "")}
             </span>
           )}
         </div>
@@ -96,8 +96,7 @@ export default function ModelBreakdown() {
 
         <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5">
           <div className="border-b border-white/10 px-3 py-2.5">
-            <h3 className="text-sm font-semibold text-slate-100">Efficiency table</h3>
-            <p className="text-xs text-slate-400">Cost, cache hit rate, output/input ratio, and error pressure</p>
+            <h3 className="text-sm font-semibold text-slate-100">Table</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -129,7 +128,7 @@ export default function ModelBreakdown() {
                 {data.length === 0 && (
                   <tr>
                     <td colSpan={7} className="px-3 py-6 text-center text-slate-500">
-                      No model data yet
+                      No data
                     </td>
                   </tr>
                 )}

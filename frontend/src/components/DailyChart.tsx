@@ -76,14 +76,14 @@ export default function DailyChart({ days = 30 }: { days?: number }) {
     <section className="rounded-2xl border border-white/10 bg-slate-950/85 p-4 shadow-[0_20px_50px_rgba(2,6,23,0.28)] backdrop-blur-md">
       <div className="flex flex-wrap items-center gap-3">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Trend layer</p>
-          <h2 className="mt-1 text-lg font-semibold text-slate-50">Usage, cost, and productivity over time</h2>
+          <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Trend</p>
+          <h2 className="mt-1 text-lg font-semibold text-slate-50">Usage</h2>
         </div>
         <div className="ml-auto flex flex-wrap gap-2">
-          <StatChip label="30d cost" value={fmtCurrency(totals.cost, 2)} />
-          <StatChip label="30d tokens" value={fmtCompact(totals.tokens)} />
-          <StatChip label="30d sessions" value={fmtCompact(totals.sessions)} />
-          <StatChip label="Cache share" value={fmtPercent(cacheShare)} />
+          <StatChip label="Cost" value={fmtCurrency(totals.cost, 2)} />
+          <StatChip label="Tokens" value={fmtCompact(totals.tokens)} />
+          <StatChip label="Sessions" value={fmtCompact(totals.sessions)} />
+          <StatChip label="Cache" value={fmtPercent(cacheShare)} />
         </div>
       </div>
 
@@ -91,8 +91,7 @@ export default function DailyChart({ days = 30 }: { days?: number }) {
         <div className="min-w-0 rounded-xl border border-white/10 bg-white/5 p-2.5">
           <div className="mb-2 flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-semibold text-slate-100">Tokens and cost</h3>
-              <p className="text-xs text-slate-400">Token composition plus cost pressure</p>
+              <h3 className="text-sm font-semibold text-slate-100">Tokens / cost</h3>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={220}>
@@ -127,8 +126,7 @@ export default function DailyChart({ days = 30 }: { days?: number }) {
         <div className="min-w-0 rounded-xl border border-white/10 bg-white/5 p-2.5">
           <div className="mb-2 flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-semibold text-slate-100">Activity and output</h3>
-              <p className="text-xs text-slate-400">Sessions, coding output, and error pressure</p>
+              <h3 className="text-sm font-semibold text-slate-100">Activity</h3>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={220}>
@@ -157,10 +155,10 @@ export default function DailyChart({ days = 30 }: { days?: number }) {
       </div>
 
       <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-        <StatChip label="Latest active time" value={fmtDurationSeconds((latest?.active_time_user_s ?? 0) + (latest?.active_time_cli_s ?? 0))} />
-        <StatChip label="Latest API latency" value={fmtDurationSeconds(latest?.api_avg_duration_ms ?? 0)} />
-        <StatChip label="Latest lines changed" value={fmtCompact(latest?.lines_of_code ?? 0)} />
-        <StatChip label="Latest error rate" value={fmtPercent(latest && latest.api_requests > 0 ? latest.api_errors / latest.api_requests : 0)} />
+        <StatChip label="Active" value={fmtDurationSeconds((latest?.active_time_user_s ?? 0) + (latest?.active_time_cli_s ?? 0))} />
+        <StatChip label="Latency" value={fmtDurationSeconds(latest?.api_avg_duration_ms ?? 0)} />
+        <StatChip label="Lines" value={fmtCompact(latest?.lines_of_code ?? 0)} />
+        <StatChip label="Errors" value={fmtPercent(latest && latest.api_requests > 0 ? latest.api_errors / latest.api_requests : 0)} />
       </div>
     </section>
   );

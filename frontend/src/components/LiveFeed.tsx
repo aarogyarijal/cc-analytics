@@ -67,8 +67,8 @@ export default function LiveFeed() {
     <aside className="flex h-full min-h-[420px] flex-col rounded-2xl border border-white/10 bg-slate-950/85 shadow-[0_20px_50px_rgba(2,6,23,0.28)] backdrop-blur-md">
       <div className="flex items-center justify-between border-b border-white/10 px-3 py-2.5">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Live console</p>
-          <h2 className="mt-1 text-sm font-semibold text-slate-50">Streaming diagnostic feed</h2>
+          <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Live</p>
+          <h2 className="mt-1 text-sm font-semibold text-slate-50">Feed</h2>
         </div>
         <span className={`flex items-center gap-1.5 text-xs ${connected ? "text-emerald-300" : "text-slate-500"}`}>
           <span className={`w-2 h-2 rounded-full ${connected ? "bg-emerald-400 animate-pulse" : "bg-slate-500"}`} />
@@ -79,11 +79,7 @@ export default function LiveFeed() {
       <div className="flex-1 overflow-y-auto p-2.5 space-y-1.5">
         {events.length === 0 ? (
           <div className="flex h-full min-h-[360px] items-center justify-center text-center">
-            <p className="text-xs text-slate-500">
-              Waiting for events
-              <br />
-              <span className="text-slate-600">Start Claude Code to stream requests, tools, and errors</span>
-            </p>
+            <p className="text-xs text-slate-500">No events</p>
           </div>
         ) : (
           events.map((ev, i) => <EventRow key={i} ev={ev} />)
