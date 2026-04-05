@@ -120,25 +120,6 @@ def get_errors(limit: int = Query(default=25, ge=1, le=100)):
     return db.query_errors(limit)
 
 
-@app.get("/")
-def index():
-    if FRONTEND_DIST.exists():
-        return FileResponse(FRONTEND_DIST / "index.html")
-    return {"status": "ok"}
-
-
-@app.get("/{path:path}")
-def spa_fallback(path: str):
-    if path.startswith("api/") or path.startswith("v1/"):
-        raise HTTPException(status_code=404, detail="not found")
-    if FRONTEND_DIST.exists():
-        file_path = FRONTEND_DIST / path
-        if file_path.exists() and file_path.is_file():
-            return FileResponse(file_path)
-        return FileResponse(FRONTEND_DIST / "index.html")
-    raise HTTPException(status_code=404, detail="not found")
-
-
 # ── SSE live feed ──────────────────────────────────────────────────────────────
 
 @app.get("/api/live")
@@ -171,3 +152,22 @@ async def live_feed(request: Request):
             "Connection": "keep-alive",
         },
     )
+
+
+@app.get("/")
+def index():
+    if FRONTEND_DIST.exists():
+        return FileResponse(FRONTEND_DIST / "index.html")
+    return {"status": "ok"}
+
+
+@app.get("/{path:path}")
+def spa_fallback(path: str):
+    if path.startswith("api/") or path.startswith("v1/"):
+        raise HTTPException(status_code=404, detail="not found")
+    if FRONTEND_DIST.exists():
+        file_path = FRONTEND_DIST / path
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(file_path)
+        return FileResponse(FRONTEND_DIST / "index.html")
+    raise HTTPException(status_code=404, detail="not found")
