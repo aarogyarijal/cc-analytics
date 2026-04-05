@@ -68,16 +68,16 @@ export default function SessionTable() {
   }
 
   return (
-    <section className="rounded-3xl border border-white/10 bg-slate-950/85 p-5 shadow-[0_20px_50px_rgba(2,6,23,0.28)] backdrop-blur-md">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <section className="rounded-2xl border border-white/10 bg-slate-950/85 p-4 shadow-[0_20px_50px_rgba(2,6,23,0.28)] backdrop-blur-md">
+      <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Session intelligence</p>
-          <h2 className="mt-2 text-xl font-semibold text-slate-50">Drill into the sessions that cost the most</h2>
+          <h2 className="mt-1 text-lg font-semibold text-slate-50">Drill into the sessions that cost the most</h2>
         </div>
         <p className="text-xs text-slate-400">Sorted by {sortKey.replace("_", " ")}</p>
       </div>
 
-      <div className="mt-5 overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+      <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-white/5">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead className="bg-black/20">
@@ -87,39 +87,39 @@ export default function SessionTable() {
                 {th("total_tokens", "Tokens")}
                 {th("duration_ms", "Duration")}
                 {th("event_count", "Events")}
-                {th("api_errors", "Errors")}
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map((row) => (
-                <tr key={row.session_id} className="border-t border-white/10 hover:bg-white/5">
-                  <td className="px-4 py-3 text-slate-100">
-                    <div className="flex flex-col gap-1">
+              {th("api_errors", "Errors")}
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((row) => (
+              <tr key={row.session_id} className="border-t border-white/10 hover:bg-white/5">
+                  <td className="px-3 py-2.5 text-slate-100">
+                    <div className="flex flex-col gap-0.5">
                       <span className="font-mono">{shortId(row.session_id, 9, 4)}</span>
                       <span className="text-[11px] text-slate-500">
                         {fmtCompact(row.api_calls)} API · {fmtCompact(row.tool_calls)} tools · {fmtCompact(row.prompt_count)} prompts
                       </span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums">
+                  <td className="px-3 py-2.5 text-right tabular-nums">
                     <div className="flex items-center justify-end gap-3">
                       <span className="text-amber-300">{fmtCurrency(row.cost_usd, 4)}</span>
-                      <span className="h-1.5 w-20 overflow-hidden rounded-full bg-white/10">
+                      <span className="h-1.5 w-16 overflow-hidden rounded-full bg-white/10">
                         <span className="block h-full rounded-full bg-amber-400" style={{ width: `${(row.cost_usd / maxCost) * 100}%` }} />
                       </span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-slate-200">{fmtCompact(row.total_tokens)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-slate-200">{fmtDurationMs(row.duration_ms)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-slate-200">{fmtCompact(row.event_count)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">
+                  <td className="px-3 py-2.5 text-right tabular-nums text-slate-200">{fmtCompact(row.total_tokens)}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-slate-200">{fmtDurationMs(row.duration_ms)}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-slate-200">{fmtCompact(row.event_count)}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums">
                     <span className={row.api_errors > 0 ? "text-rose-300" : "text-emerald-300"}>{fmtCompact(row.api_errors)}</span>
                   </td>
                 </tr>
               ))}
               {data.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={6} className="px-3 py-6 text-center text-slate-500">
                     No session data yet
                   </td>
                 </tr>
@@ -127,7 +127,7 @@ export default function SessionTable() {
             </tbody>
           </table>
         </div>
-        <div className="grid gap-3 border-t border-white/10 bg-black/20 px-4 py-3 text-[11px] text-slate-400 sm:grid-cols-4">
+        <div className="grid gap-2 border-t border-white/10 bg-black/20 px-3 py-2.5 text-[11px] text-slate-400 sm:grid-cols-4">
           <span>{fmtDurationSeconds(sorted.reduce((sum, row) => sum + row.active_time_user_s + row.active_time_cli_s, 0))} active time</span>
           <span>{fmtCompact(sorted.reduce((sum, row) => sum + row.lines_added + row.lines_removed, 0))} lines changed</span>
           <span>{fmtCompact(sorted.reduce((sum, row) => sum + row.commits, 0))} commits</span>

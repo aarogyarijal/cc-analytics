@@ -48,11 +48,11 @@ export default function ModelBreakdown() {
   const totalCost = data.reduce((sum, row) => sum + row.cost_usd, 0);
 
   return (
-    <section className="rounded-3xl border border-white/10 bg-slate-950/85 p-5 shadow-[0_20px_50px_rgba(2,6,23,0.28)] backdrop-blur-md">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <section className="rounded-2xl border border-white/10 bg-slate-950/85 p-4 shadow-[0_20px_50px_rgba(2,6,23,0.28)] backdrop-blur-md">
+      <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Model intelligence</p>
-          <h2 className="mt-2 text-xl font-semibold text-slate-50">Which model is expensive, efficient, or noisy?</h2>
+          <h2 className="mt-1 text-lg font-semibold text-slate-50">Which model is expensive, efficient, or noisy?</h2>
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
           <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-300">
@@ -66,11 +66,11 @@ export default function ModelBreakdown() {
         </div>
       </div>
 
-      <div className="mt-5 grid gap-5 xl:grid-cols-[1.2fr_1fr]">
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+      <div className="mt-4 grid gap-4 xl:grid-cols-[1.15fr_0.95fr]">
+        <div className="rounded-xl border border-white/10 bg-white/5 p-2.5">
           <h3 className="mb-2 text-sm font-semibold text-slate-100">Cost by model</h3>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={chartData} layout="vertical" margin={{ top: 10, right: 24, left: 8, bottom: 0 }}>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={chartData} layout="vertical" margin={{ top: 6, right: 16, left: 8, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
               <XAxis type="number" tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={(v) => fmtCurrency(Number(v), 0)} />
               <YAxis type="category" dataKey="model" tick={{ fontSize: 11, fill: "#cbd5e1" }} width={110} />
@@ -94,8 +94,8 @@ export default function ModelBreakdown() {
           </ResponsiveContainer>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
-          <div className="border-b border-white/10 px-4 py-3">
+        <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5">
+          <div className="border-b border-white/10 px-3 py-2.5">
             <h3 className="text-sm font-semibold text-slate-100">Efficiency table</h3>
             <p className="text-xs text-slate-400">Cost, cache hit rate, output/input ratio, and error pressure</p>
           </div>
@@ -103,32 +103,32 @@ export default function ModelBreakdown() {
             <table className="w-full text-xs">
               <thead className="bg-black/20 text-slate-400">
                 <tr>
-                  <th className="px-4 py-3 text-left font-medium">Model</th>
-                  <th className="px-4 py-3 text-right font-medium">Requests</th>
-                  <th className="px-4 py-3 text-right font-medium">Cost</th>
-                  <th className="px-4 py-3 text-right font-medium">Cache</th>
-                  <th className="px-4 py-3 text-right font-medium">Out/In</th>
-                  <th className="px-4 py-3 text-right font-medium">Errors</th>
-                  <th className="px-4 py-3 text-right font-medium">Cost / req</th>
+                  <th className="px-3 py-2.5 text-left font-medium">Model</th>
+                  <th className="px-3 py-2.5 text-right font-medium">Req</th>
+                  <th className="px-3 py-2.5 text-right font-medium">Cost</th>
+                  <th className="px-3 py-2.5 text-right font-medium">Cache</th>
+                  <th className="px-3 py-2.5 text-right font-medium">Out/In</th>
+                  <th className="px-3 py-2.5 text-right font-medium">Err</th>
+                  <th className="px-3 py-2.5 text-right font-medium">$/req</th>
                 </tr>
               </thead>
               <tbody>
                 {data.map((row) => (
                   <tr key={row.model} className="border-t border-white/10 hover:bg-white/5">
-                    <td className="px-4 py-3 text-slate-100">{shortId(row.model, 12, 6).replace("claude-", "")}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-slate-200">{fmtCompact(row.request_count)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-amber-300">{fmtCurrency(row.cost_usd, 4)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-emerald-300">{fmtPercent(row.cache_hit_rate)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-sky-300">{row.output_input_ratio.toFixed(2)}x</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-rose-300">{fmtPercent(row.error_rate)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-slate-300">
+                    <td className="px-3 py-2.5 text-slate-100">{shortId(row.model, 12, 6).replace("claude-", "")}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-slate-200">{fmtCompact(row.request_count)}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-amber-300">{fmtCurrency(row.cost_usd, 4)}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-emerald-300">{fmtPercent(row.cache_hit_rate)}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-sky-300">{row.output_input_ratio.toFixed(2)}x</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-rose-300">{fmtPercent(row.error_rate)}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-slate-300">
                       {fmtCurrency(row.cost_per_request_usd, 4)}
                     </td>
                   </tr>
                 ))}
                 {data.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                    <td colSpan={7} className="px-3 py-6 text-center text-slate-500">
                       No model data yet
                     </td>
                   </tr>

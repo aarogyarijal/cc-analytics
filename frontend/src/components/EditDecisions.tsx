@@ -63,11 +63,11 @@ export default function EditDecisions() {
   const overallRate = totalAccept + totalReject > 0 ? totalAccept / (totalAccept + totalReject) : 0;
 
   return (
-    <section className="rounded-3xl border border-white/10 bg-slate-950/85 p-5 shadow-[0_20px_50px_rgba(2,6,23,0.28)] backdrop-blur-md">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <section className="rounded-2xl border border-white/10 bg-slate-950/85 p-4 shadow-[0_20px_50px_rgba(2,6,23,0.28)] backdrop-blur-md">
+      <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Edit behavior</p>
-          <h2 className="mt-2 text-xl font-semibold text-slate-50">Where users accept, reject, or hesitate</h2>
+          <h2 className="mt-1 text-lg font-semibold text-slate-50">Where users accept, reject, or hesitate</h2>
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
           <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-300">
@@ -79,14 +79,14 @@ export default function EditDecisions() {
         </div>
       </div>
 
-      <div className="mt-5 grid gap-5 xl:grid-cols-2">
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+      <div className="mt-4 grid gap-4 xl:grid-cols-2">
+        <div className="rounded-xl border border-white/10 bg-white/5 p-2.5">
           <h3 className="mb-2 text-sm font-semibold text-slate-100">By tool</h3>
           {toolData.length === 0 ? (
-            <p className="py-8 text-center text-slate-500">No edit decisions yet</p>
+            <p className="py-6 text-center text-slate-500">No edit decisions yet</p>
           ) : (
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={toolData} layout="vertical" margin={{ left: 8, right: 24, top: 10, bottom: 0 }}>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={toolData} layout="vertical" margin={{ left: 8, right: 16, top: 6, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
                 <XAxis type="number" tick={{ fontSize: 11, fill: "#94a3b8" }} />
                 <YAxis dataKey="tool" type="category" tick={{ fontSize: 11, fill: "#cbd5e1" }} width={70} />
@@ -107,11 +107,11 @@ export default function EditDecisions() {
           )}
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+        <div className="rounded-xl border border-white/10 bg-white/5 p-2.5">
           <h3 className="mb-2 text-sm font-semibold text-slate-100">By language</h3>
-          <div className="space-y-3">
+          <div className="space-y-2">
             {languageData.map((row) => (
-              <div key={row.language} className="rounded-xl border border-white/10 bg-black/20 px-3 py-3">
+              <div key={row.language} className="rounded-xl border border-white/10 bg-black/20 px-3 py-2.5">
                 <div className="flex items-center justify-between gap-2">
                   <div>
                     <p className="text-sm font-medium text-slate-100">{row.language}</p>
@@ -129,7 +129,7 @@ export default function EditDecisions() {
                 </div>
               </div>
             ))}
-            {languageData.length === 0 && <p className="py-8 text-center text-slate-500">No language data yet</p>}
+            {languageData.length === 0 && <p className="py-6 text-center text-slate-500">No language data yet</p>}
           </div>
         </div>
       </div>

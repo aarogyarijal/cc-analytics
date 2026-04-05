@@ -196,33 +196,33 @@ export default function OverviewCards() {
   ];
 
   return (
-    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
       {cards.map((card) => (
         <StatCard key={card.label} {...card} />
       ))}
 
-      <div className="sm:col-span-2 xl:col-span-3 rounded-2xl border border-cyan-400/15 bg-gradient-to-r from-cyan-400/10 via-slate-950 to-amber-400/10 p-4 shadow-[0_20px_50px_rgba(2,6,23,0.22)] backdrop-blur-md">
-        <div className="flex flex-wrap items-center gap-4">
+      <div className="sm:col-span-2 lg:col-span-3 xl:col-span-6 rounded-2xl border border-cyan-400/15 bg-gradient-to-r from-cyan-400/10 via-slate-950 to-amber-400/10 p-3 shadow-[0_20px_50px_rgba(2,6,23,0.22)] backdrop-blur-md">
+        <div className="flex flex-wrap items-center gap-3">
           <div>
             <p className="text-[11px] uppercase tracking-[0.24em] text-slate-400">Signal summary</p>
-            <h2 className="mt-2 text-lg font-semibold text-slate-50">What the current telemetry says</h2>
+            <h2 className="mt-1 text-base font-semibold text-slate-50">What the current telemetry says</h2>
           </div>
           <div className="ml-auto grid gap-2 sm:grid-cols-3">
             <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
               <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">7d avg cost</p>
-              <p className="mt-1 text-sm font-semibold text-slate-100">
+              <p className="mt-1 text-xs font-semibold text-slate-100">
                 {fmtCurrency(sevenDays.reduce((sum, d) => sum + d.cost_usd, 0) / Math.max(sevenDays.length, 1), 4)}
               </p>
             </div>
             <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
               <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">7d sessions</p>
-              <p className="mt-1 text-sm font-semibold text-slate-100">
+              <p className="mt-1 text-xs font-semibold text-slate-100">
                 {fmtCompact(sevenDays.reduce((sum, d) => sum + d.sessions, 0))}
               </p>
             </div>
             <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
               <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">7d active time</p>
-              <p className="mt-1 text-sm font-semibold text-slate-100">
+              <p className="mt-1 text-xs font-semibold text-slate-100">
                 {fmtDurationSeconds(
                   sevenDays.reduce((sum, d) => sum + d.active_time_user_s + d.active_time_cli_s, 0),
                 )}
@@ -230,7 +230,7 @@ export default function OverviewCards() {
             </div>
           </div>
         </div>
-        <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-300">
+        <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-300">
           <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
             {fmtCompact(latest?.lines_of_code ?? 0)} lines changed today
           </span>

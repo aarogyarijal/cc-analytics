@@ -30,11 +30,11 @@ export default function ErrorPanel() {
   const worst = data[0];
 
   return (
-    <section className="rounded-3xl border border-white/10 bg-slate-950/85 p-5 shadow-[0_20px_50px_rgba(2,6,23,0.28)] backdrop-blur-md">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <section className="rounded-2xl border border-white/10 bg-slate-950/85 p-4 shadow-[0_20px_50px_rgba(2,6,23,0.28)] backdrop-blur-md">
+      <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">API errors</p>
-          <h2 className="mt-2 text-xl font-semibold text-slate-50">Failure hotspots and retry pressure</h2>
+          <h2 className="mt-1 text-lg font-semibold text-slate-50">Failure hotspots and retry pressure</h2>
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
           <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-300">
@@ -48,7 +48,7 @@ export default function ErrorPanel() {
         </div>
       </div>
 
-      <div className="mt-5 overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+      <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-white/5">
         <table className="w-full text-xs">
           <thead className="bg-black/20">
             <tr>
@@ -64,18 +64,18 @@ export default function ErrorPanel() {
           <tbody>
             {data.map((row) => (
               <tr key={`${row.model}-${row.status_code}`} className="border-t border-white/10 hover:bg-white/5">
-                <td className="px-4 py-3 text-slate-100">{shortId(row.model || "unknown", 12, 6)}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-slate-200">{row.status_code}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-rose-300">{fmtCompact(row.count)}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-slate-200">{fmtDurationMs(row.avg_duration_ms)}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-slate-500">{fmtDurationMs(row.max_duration_ms)}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-slate-200">{fmtCompact(row.max_attempt)}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-slate-500">{timeAgo(row.last_seen_ts)}</td>
+                <td className="px-3 py-2.5 text-slate-100">{shortId(row.model || "unknown", 12, 6)}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums text-slate-200">{row.status_code}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums text-rose-300">{fmtCompact(row.count)}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums text-slate-200">{fmtDurationMs(row.avg_duration_ms)}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{fmtDurationMs(row.max_duration_ms)}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums text-slate-200">{fmtCompact(row.max_attempt)}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{timeAgo(row.last_seen_ts)}</td>
               </tr>
             ))}
             {data.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={7} className="px-3 py-6 text-center text-slate-500">
                   No API errors captured yet
                 </td>
               </tr>

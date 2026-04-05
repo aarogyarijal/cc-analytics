@@ -22,10 +22,10 @@ export default function App() {
         </div>
 
         <header className="relative z-10 border-b border-white/10 bg-slate-950/70 backdrop-blur-xl">
-          <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+          <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-5 lg:px-6">
             <div>
               <p className="text-[11px] uppercase tracking-[0.28em] text-slate-500">cc-analytics</p>
-              <h1 className="mt-1 text-xl font-semibold tracking-tight text-slate-50 sm:text-2xl">
+              <h1 className="mt-1 text-lg font-semibold tracking-tight text-slate-50 sm:text-xl">
                 Claude Code Intelligence Dashboard
               </h1>
             </div>
@@ -35,22 +35,24 @@ export default function App() {
           </div>
         </header>
 
-        <main className="relative z-10 mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+        <main className="relative z-10 mx-auto max-w-6xl space-y-4 px-4 py-4 sm:px-5 lg:px-6">
           <OverviewCards />
 
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_320px]">
             <DailyChart days={30} />
-            <LiveFeed />
+            <div className="xl:sticky xl:top-4">
+              <LiveFeed />
+            </div>
           </div>
 
           <ModelBreakdown />
 
-          <div className="grid gap-6 xl:grid-cols-2">
+          <div className="grid gap-4 xl:grid-cols-2">
             <ToolTable />
             <EditDecisions />
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-2">
+          <div className="grid gap-4 xl:grid-cols-2">
             <ErrorPanel />
             <SessionTable />
           </div>

@@ -64,8 +64,8 @@ export default function LiveFeed() {
   const { events, connected } = useLiveFeed();
 
   return (
-    <aside className="flex min-h-[520px] flex-col rounded-3xl border border-white/10 bg-slate-950/85 shadow-[0_20px_50px_rgba(2,6,23,0.28)] backdrop-blur-md">
-      <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+    <aside className="flex h-full min-h-[420px] flex-col rounded-2xl border border-white/10 bg-slate-950/85 shadow-[0_20px_50px_rgba(2,6,23,0.28)] backdrop-blur-md">
+      <div className="flex items-center justify-between border-b border-white/10 px-3 py-2.5">
         <div>
           <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Live console</p>
           <h2 className="mt-1 text-sm font-semibold text-slate-50">Streaming diagnostic feed</h2>
@@ -76,9 +76,9 @@ export default function LiveFeed() {
         </span>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3 space-y-2">
+      <div className="flex-1 overflow-y-auto p-2.5 space-y-1.5">
         {events.length === 0 ? (
-          <div className="flex h-full min-h-[420px] items-center justify-center text-center">
+          <div className="flex h-full min-h-[360px] items-center justify-center text-center">
             <p className="text-xs text-slate-500">
               Waiting for events
               <br />

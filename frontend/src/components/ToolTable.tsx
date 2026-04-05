@@ -65,18 +65,18 @@ export default function ToolTable() {
   }
 
   return (
-    <section className="rounded-3xl border border-white/10 bg-slate-950/85 p-5 shadow-[0_20px_50px_rgba(2,6,23,0.28)] backdrop-blur-md">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <section className="rounded-2xl border border-white/10 bg-slate-950/85 p-4 shadow-[0_20px_50px_rgba(2,6,23,0.28)] backdrop-blur-md">
+      <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Tool quality</p>
-          <h2 className="mt-2 text-xl font-semibold text-slate-50">Reliability and latency by tool</h2>
+          <h2 className="mt-1 text-lg font-semibold text-slate-50">Reliability and latency by tool</h2>
         </div>
         <div className="text-xs text-slate-400">
           Sorted by <span className="text-slate-200">{sortKey}</span>
         </div>
       </div>
 
-      <div className="mt-5 overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+      <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-white/5">
         <table className="w-full text-xs">
           <thead className="bg-black/20">
             <tr>
@@ -92,11 +92,11 @@ export default function ToolTable() {
           <tbody>
             {sorted.map((row) => (
               <tr key={row.tool} className="border-t border-white/10 hover:bg-white/5">
-                <td className="px-4 py-3 font-mono text-slate-100">{row.tool}</td>
-                <td className="px-4 py-3 text-right tabular-nums">
+                <td className="px-3 py-2.5 font-mono text-slate-100">{row.tool}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums">
                   <div className="flex items-center justify-end gap-3">
                     <span className="text-slate-200">{fmtCompact(row.calls)}</span>
-                    <span className="h-1.5 w-20 overflow-hidden rounded-full bg-white/10">
+                    <span className="h-1.5 w-16 overflow-hidden rounded-full bg-white/10">
                       <span
                         className="block h-full rounded-full bg-sky-400"
                         style={{ width: `${(row.calls / maxCalls) * 100}%` }}
@@ -104,7 +104,7 @@ export default function ToolTable() {
                     </span>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-right tabular-nums">
+                <td className="px-3 py-2.5 text-right tabular-nums">
                   <span
                     className={
                       row.success_rate >= 0.95
@@ -117,15 +117,15 @@ export default function ToolTable() {
                     {fmtPercent(row.success_rate)}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-right tabular-nums text-rose-300">{fmtCompact(row.failures)}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-slate-200">{fmtDurationMs(row.avg_duration_ms)}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-cyan-300">{fmtDurationMs(row.p95_duration_ms)}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-slate-500">{fmtDurationMs(row.max_duration_ms)}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums text-rose-300">{fmtCompact(row.failures)}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums text-slate-200">{fmtDurationMs(row.avg_duration_ms)}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums text-cyan-300">{fmtDurationMs(row.p95_duration_ms)}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{fmtDurationMs(row.max_duration_ms)}</td>
               </tr>
             ))}
             {data.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={7} className="px-3 py-6 text-center text-slate-500">
                   No tool data yet, start a Claude Code session
                 </td>
               </tr>
