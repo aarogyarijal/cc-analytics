@@ -87,15 +87,15 @@ export default function DailyChart({ days = 30 }: { days?: number }) {
         </div>
       </div>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-2">
-        <div className="rounded-xl border border-white/10 bg-white/5 p-2.5">
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        <div className="min-w-0 rounded-xl border border-white/10 bg-white/5 p-2.5">
           <div className="mb-2 flex items-center justify-between">
             <div>
               <h3 className="text-sm font-semibold text-slate-100">Tokens and cost</h3>
               <p className="text-xs text-slate-400">Token composition plus cost pressure</p>
             </div>
           </div>
-          <ResponsiveContainer width="100%" height={240}>
+          <ResponsiveContainer width="100%" height={220}>
             <ComposedChart data={data} margin={{ top: 6, right: 16, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
               <XAxis dataKey="date" tickFormatter={shortDate} tick={{ fontSize: 11, fill: "#94a3b8" }} />
@@ -124,14 +124,14 @@ export default function DailyChart({ days = 30 }: { days?: number }) {
           </ResponsiveContainer>
         </div>
 
-        <div className="rounded-xl border border-white/10 bg-white/5 p-2.5">
+        <div className="min-w-0 rounded-xl border border-white/10 bg-white/5 p-2.5">
           <div className="mb-2 flex items-center justify-between">
             <div>
               <h3 className="text-sm font-semibold text-slate-100">Activity and output</h3>
               <p className="text-xs text-slate-400">Sessions, coding output, and error pressure</p>
             </div>
           </div>
-          <ResponsiveContainer width="100%" height={240}>
+          <ResponsiveContainer width="100%" height={220}>
             <AreaChart data={data} margin={{ top: 6, right: 16, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
               <XAxis dataKey="date" tickFormatter={shortDate} tick={{ fontSize: 11, fill: "#94a3b8" }} />
