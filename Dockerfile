@@ -29,4 +29,4 @@ RUN mkdir -p /data
 
 EXPOSE 6767
 
-CMD ["sh", "-c", "mkdir -p /data && exec uvicorn backend.main:app --host 0.0.0.0 --port ${PORT}"]
+CMD ["sh", "-c", "mkdir -p /data && exec uvicorn main:app --host 0.0.0.0 --port ${PORT} --app-dir /app/backend"]
