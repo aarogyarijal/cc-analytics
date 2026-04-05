@@ -2,16 +2,19 @@ import asyncio
 import json
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI, Request, Query
+from fastapi import FastAPI, HTTPException, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 
 import db
 import otlp
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("cc-analytics")
+FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 
 # Set of asyncio Queues — one per connected SSE client
 _subscribers: set[asyncio.Queue] = set()
@@ -43,6 +46,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+if FRONTEND_DIST.exists():
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
 
 
 # ── OTLP receivers ─────────────────────────────────────────────────────────────
@@ -112,6 +118,25 @@ def get_sessions(limit: int = Query(default=50, ge=1, le=500)):
 @app.get("/api/errors")
 def get_errors(limit: int = Query(default=25, ge=1, le=100)):
     return db.query_errors(limit)
+
+
+@app.get("/")
+def index():
+    if FRONTEND_DIST.exists():
+        return FileResponse(FRONTEND_DIST / "index.html")
+    return {"status": "ok"}
+
+
+@app.get("/{path:path}")
+def spa_fallback(path: str):
+    if path.startswith("api/") or path.startswith("v1/"):
+        raise HTTPException(status_code=404, detail="not found")
+    if FRONTEND_DIST.exists():
+        file_path = FRONTEND_DIST / path
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(file_path)
+        return FileResponse(FRONTEND_DIST / "index.html")
+    raise HTTPException(status_code=404, detail="not found")
 
 
 # ── SSE live feed ──────────────────────────────────────────────────────────────

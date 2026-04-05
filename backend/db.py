@@ -1,10 +1,11 @@
+import os
 import sqlite3
 import json
 import time
 from pathlib import Path
 from contextlib import contextmanager
 
-DB_PATH = Path(__file__).parent / "analytics.db"
+DB_PATH = Path(os.getenv("CC_ANALYTICS_DB_PATH", str(Path(__file__).parent / "analytics.db")))
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS metrics (

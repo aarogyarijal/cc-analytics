@@ -1,0 +1,15 @@
+services:
+  cc-analytics:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      CC_ANALYTICS_DB_PATH: /data/analytics.db
+    volumes:
+      - cc-analytics-data:/data
+    restart: unless-stopped
+
+volumes:
+  cc-analytics-data:

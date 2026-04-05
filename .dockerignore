@@ -1,0 +1,16 @@
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/node_modules/
+**/dist/
+**/.venv/
+.git
+.DS_Store
+frontend/dist
+backend/analytics.db-journal
+backend/analytics.db-wal
+backend/analytics.db-shm
