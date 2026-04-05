@@ -4,9 +4,10 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      - "6767:6767"
     environment:
       CC_ANALYTICS_DB_PATH: /data/analytics.db
+      PORT: "6767"
     volumes:
       - cc-analytics-data:/data
     restart: unless-stopped

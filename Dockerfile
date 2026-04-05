@@ -11,7 +11,7 @@ FROM python:3.12-slim AS backend
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     CC_ANALYTICS_DB_PATH=/data/analytics.db \
-    PORT=8000
+    PORT=6767
 
 WORKDIR /app
 
@@ -27,6 +27,6 @@ COPY --from=frontend-build /app/frontend/dist /app/frontend/dist
 
 RUN mkdir -p /data
 
-EXPOSE 8000
+EXPOSE 6767
 
 CMD ["sh", "-c", "mkdir -p /data && exec uvicorn backend.main:app --host 0.0.0.0 --port ${PORT}"]
