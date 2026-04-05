@@ -1,7 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
+import { Treemap, ResponsiveContainer } from "recharts";
 import { useLiveFeed } from "../hooks/useLiveFeed";
-import { fmtCompact, fmtDurationMs, fmtPercent } from "../lib/format";
+import { fmtCompact, fmtDurationMs, fmtPercent, fmtDurationSeconds } from "../lib/format";
 
 type ToolRow = {
   tool: string;
@@ -74,6 +75,37 @@ export default function ToolTable() {
         <div className="text-xs text-slate-400">{sortKey}</div>
       </div>
 
+      {/* Treemap visualization */}
+      <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-2.5">
+        <h3 className="mb-2 text-sm font-semibold text-slate-100">Time Budget by Tool</h3>
+        <ResponsiveContainer width="100%" height={120}>
+          <Treemap
+            data={sorted.map((row) => ({
+              name: row.tool,
+              value: Math.max((row.avg_duration_ms * row.calls) / 1000, 1), // seconds
+              success_rate: row.success_rate,
+            }))}
+            dataKey="value"
+            stroke="rgba(148,163,184,0.18)"
+            fill="#38bdf8"
+            content={({ x, y, width, height, payload }: any) => {
+              const sr = (payload?.success_rate as number) || 0;
+              const fillColor = sr >= 0.95 ? "#22c55e" : sr >= 0.8 ? "#f59e0b" : "#ef4444";
+              return (
+                <g>
+                  <rect x={x} y={y} width={width} height={height} fill={fillColor} fillOpacity={0.3} stroke="rgba(148,163,184,0.18)" />
+                  {width > 40 && height > 20 && (
+                    <text x={x + width / 2} y={y + height / 2} textAnchor="middle" dominantBaseline="middle" fill="#cbd5e1" fontSize={11} fontWeight={600}>
+                      {payload?.name}
+                    </text>
+                  )}
+                </g>
+              );
+            }}
+          />
+        </ResponsiveContainer>
+      </div>
+
       <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-white/5">
         <table className="w-full text-xs">
           <thead className="bg-black/20">
@@ -85,45 +117,59 @@ export default function ToolTable() {
               {th("avg_duration_ms", "Avg")}
               {th("p95_duration_ms", "P95")}
               {th("max_duration_ms", "Max")}
+              <th className={`cursor-pointer select-none px-4 py-3 font-medium text-slate-400 hover:text-slate-200 text-right`}>
+                Bottleneck
+              </th>
+              <th className={`cursor-pointer select-none px-4 py-3 font-medium text-slate-400 hover:text-slate-200 text-right`}>
+                Time Budget
+              </th>
             </tr>
           </thead>
           <tbody>
-            {sorted.map((row) => (
-              <tr key={row.tool} className="border-t border-white/10 hover:bg-white/5">
-                <td className="px-3 py-2.5 font-mono text-slate-100">{row.tool}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums">
-                  <div className="flex items-center justify-end gap-3">
-                    <span className="text-slate-200">{fmtCompact(row.calls)}</span>
-                    <span className="h-1.5 w-16 overflow-hidden rounded-full bg-white/10">
-                      <span
-                        className="block h-full rounded-full bg-sky-400"
-                        style={{ width: `${(row.calls / maxCalls) * 100}%` }}
-                      />
+            {sorted.map((row) => {
+              const bottleneck = row.avg_duration_ms > 0 ? row.p95_duration_ms / row.avg_duration_ms : 1;
+              const timeBudget = (row.avg_duration_ms * row.calls) / 1000; // in seconds
+              const bottleneckColor = bottleneck > 3 ? "text-rose-300" : bottleneck > 1.5 ? "text-amber-300" : "text-slate-400";
+
+              return (
+                <tr key={row.tool} className="border-t border-white/10 hover:bg-white/5">
+                  <td className="px-3 py-2.5 font-mono text-slate-100">{row.tool}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums">
+                    <div className="flex items-center justify-end gap-3">
+                      <span className="text-slate-200">{fmtCompact(row.calls)}</span>
+                      <span className="h-1.5 w-16 overflow-hidden rounded-full bg-white/10">
+                        <span
+                          className="block h-full rounded-full bg-sky-400"
+                          style={{ width: `${(row.calls / maxCalls) * 100}%` }}
+                        />
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-3 py-2.5 text-right tabular-nums">
+                    <span
+                      className={
+                        row.success_rate >= 0.95
+                          ? "text-emerald-300"
+                          : row.success_rate >= 0.8
+                            ? "text-amber-300"
+                            : "text-rose-300"
+                      }
+                    >
+                      {fmtPercent(row.success_rate)}
                     </span>
-                  </div>
-                </td>
-                <td className="px-3 py-2.5 text-right tabular-nums">
-                  <span
-                    className={
-                      row.success_rate >= 0.95
-                        ? "text-emerald-300"
-                        : row.success_rate >= 0.8
-                          ? "text-amber-300"
-                          : "text-rose-300"
-                    }
-                  >
-                    {fmtPercent(row.success_rate)}
-                  </span>
-                </td>
-                <td className="px-3 py-2.5 text-right tabular-nums text-rose-300">{fmtCompact(row.failures)}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums text-slate-200">{fmtDurationMs(row.avg_duration_ms)}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums text-cyan-300">{fmtDurationMs(row.p95_duration_ms)}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{fmtDurationMs(row.max_duration_ms)}</td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-rose-300">{fmtCompact(row.failures)}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-slate-200">{fmtDurationMs(row.avg_duration_ms)}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-cyan-300">{fmtDurationMs(row.p95_duration_ms)}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{fmtDurationMs(row.max_duration_ms)}</td>
+                  <td className={`px-3 py-2.5 text-right tabular-nums ${bottleneckColor}`}>{bottleneck.toFixed(1)}×</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-slate-300">{fmtDurationSeconds(timeBudget)}</td>
+                </tr>
+              );
+            })}
             {data.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-3 py-6 text-center text-slate-500">
+                <td colSpan={9} className="px-3 py-6 text-center text-slate-500">
                   No data
                 </td>
               </tr>

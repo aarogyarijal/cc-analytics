@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { fmtCompact, fmtCurrency, fmtDurationMs, fmtDurationSeconds, shortId } from "../lib/format";
+import { fmtCompact, fmtCurrency, fmtDurationMs, fmtDurationSeconds, fmtPercent, shortId } from "../lib/format";
 
 type SessionRow = {
   session_id: string;
@@ -37,6 +37,7 @@ export default function SessionTable() {
 
   const [sortKey, setSortKey] = useState<SortKey>("cost_usd");
   const [asc, setAsc] = useState(false);
+  const [showInsights, setShowInsights] = useState(false);
 
   const sorted = useMemo(
     () =>
@@ -49,6 +50,7 @@ export default function SessionTable() {
   );
 
   const maxCost = sorted[0]?.cost_usd || 1;
+  const p90Cost = sorted[Math.floor(sorted.length * 0.1)]?.cost_usd || 0; // 90th percentile
 
   function th(key: SortKey, label: string) {
     return (
@@ -74,7 +76,15 @@ export default function SessionTable() {
           <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Sessions</p>
           <h2 className="mt-1 text-lg font-semibold text-slate-50">Costliest</h2>
         </div>
-        <p className="text-xs text-slate-400">{sortKey.replace("_", " ")}</p>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowInsights(!showInsights)}
+            className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:bg-white/10"
+          >
+            {showInsights ? "Standard" : "Insights"}
+          </button>
+          <p className="text-xs text-slate-400">{sortKey.replace("_", " ")}</p>
+        </div>
       </div>
 
       <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-white/5">
@@ -83,16 +93,39 @@ export default function SessionTable() {
             <thead className="bg-black/20">
               <tr>
                 <th className="px-4 py-3 text-left font-medium text-slate-400">Session</th>
-                {th("cost_usd", "Cost")}
-                {th("total_tokens", "Tokens")}
-                {th("duration_ms", "Duration")}
-                {th("event_count", "Events")}
-              {th("api_errors", "Errors")}
+                {!showInsights ? (
+                  <>
+                    {th("cost_usd", "Cost")}
+                    {th("total_tokens", "Tokens")}
+                    {th("duration_ms", "Duration")}
+                    {th("event_count", "Events")}
+                    {th("api_errors", "Errors")}
+                  </>
+                ) : (
+                  <>
+                    <th className="px-4 py-3 text-right font-medium text-slate-400">Depth</th>
+                    <th className="px-4 py-3 text-right font-medium text-slate-400">Tool Sat.</th>
+                    <th className="px-4 py-3 text-right font-medium text-slate-400">Burn Rate</th>
+                    <th className="px-4 py-3 text-right font-medium text-slate-400">$/Line</th>
+                  </>
+                )}
             </tr>
           </thead>
           <tbody>
-            {sorted.map((row) => (
-              <tr key={row.session_id} className="border-t border-white/10 hover:bg-white/5">
+            {sorted.map((row) => {
+              const isRunaway = row.cost_usd > p90Cost * 3 && row.commits === 0;
+              const depthIndex = row.prompt_count > 0 ? row.api_calls / row.prompt_count : 0;
+              const toolSaturation = row.api_calls > 0 ? row.tool_calls / row.api_calls : 0;
+              const activeTime = row.active_time_user_s + row.active_time_cli_s;
+              const burnRate = activeTime > 0 ? (row.cost_usd / (activeTime / 3600)) : 0;
+              const linesChanged = row.lines_added + row.lines_removed;
+              const costPerLine = linesChanged > 0 ? row.cost_usd / linesChanged : 0;
+
+              return (
+                <tr
+                  key={row.session_id}
+                  className={`border-t border-white/10 hover:bg-white/5 ${isRunaway ? "border-l-2 border-l-rose-500 bg-rose-500/5" : ""}`}
+                >
                   <td className="px-3 py-2.5 text-slate-100">
                     <div className="flex flex-col gap-0.5">
                       <span className="font-mono">{shortId(row.session_id, 9, 4)}</span>
@@ -101,25 +134,39 @@ export default function SessionTable() {
                       </span>
                     </div>
                   </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums">
-                    <div className="flex items-center justify-end gap-3">
-                      <span className="text-amber-300">{fmtCurrency(row.cost_usd, 4)}</span>
-                      <span className="h-1.5 w-16 overflow-hidden rounded-full bg-white/10">
-                        <span className="block h-full rounded-full bg-amber-400" style={{ width: `${(row.cost_usd / maxCost) * 100}%` }} />
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums text-slate-200">{fmtCompact(row.total_tokens)}</td>
-                  <td className="px-3 py-2.5 text-right tabular-nums text-slate-200">{fmtDurationMs(row.duration_ms)}</td>
-                  <td className="px-3 py-2.5 text-right tabular-nums text-slate-200">{fmtCompact(row.event_count)}</td>
-                  <td className="px-3 py-2.5 text-right tabular-nums">
-                    <span className={row.api_errors > 0 ? "text-rose-300" : "text-emerald-300"}>{fmtCompact(row.api_errors)}</span>
-                  </td>
+                  {!showInsights ? (
+                    <>
+                      <td className="px-3 py-2.5 text-right tabular-nums">
+                        <div className="flex items-center justify-end gap-3">
+                          <span className="text-amber-300">{fmtCurrency(row.cost_usd, 4)}</span>
+                          <span className="h-1.5 w-16 overflow-hidden rounded-full bg-white/10">
+                            <span className="block h-full rounded-full bg-amber-400" style={{ width: `${(row.cost_usd / maxCost) * 100}%` }} />
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-slate-200">{fmtCompact(row.total_tokens)}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-slate-200">{fmtDurationMs(row.duration_ms)}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-slate-200">{fmtCompact(row.event_count)}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums">
+                        <span className={row.api_errors > 0 ? "text-rose-300" : "text-emerald-300"}>{fmtCompact(row.api_errors)}</span>
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-cyan-300">{depthIndex.toFixed(1)}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-purple-300">{fmtPercent(toolSaturation)}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-amber-300">{fmtCurrency(burnRate, 2)}/hr</td>
+                      <td className={`px-3 py-2.5 text-right tabular-nums ${costPerLine > 0.01 ? "text-rose-300" : "text-emerald-300"}`}>
+                        {fmtCurrency(costPerLine, 4)}
+                      </td>
+                    </>
+                  )}
                 </tr>
-              ))}
+              );
+            })}
               {data.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-3 py-6 text-center text-slate-500">
+                  <td colSpan={5} className="px-3 py-6 text-center text-slate-500">
                     No data
                   </td>
                 </tr>

@@ -8,6 +8,7 @@ type Overview = {
     cache_read_tokens: number;
     cache_creation_tokens: number;
     cost_usd: number;
+    cache_savings_usd: number;
     sessions: number;
     active_time_user_s: number;
     active_time_cli_s: number;
@@ -106,6 +107,17 @@ export default function OverviewCards() {
       ((today?.input_tokens ?? 0) + (today?.cache_read_tokens ?? 0) + (today?.cache_creation_tokens ?? 0))
     : 0;
 
+  // Efficiency metrics for 2nd row
+  const linesChanged = (today?.lines_added ?? 0) + (today?.lines_removed ?? 0);
+  const costPerLine = linesChanged > 0 ? (today?.cost_usd ?? 0) / linesChanged : 0;
+  const costPerCommit = (today?.commits ?? 0) > 0 ? (today?.cost_usd ?? 0) / (today?.commits ?? 0) : 0;
+  const burnRate = (today?.active_time_user_s ?? 0) + (today?.active_time_cli_s ?? 0) > 0
+    ? ((today?.cost_usd ?? 0) / ((today?.active_time_user_s ?? 0) + (today?.active_time_cli_s ?? 0))) * 3600
+    : 0;
+  const cacheSavingsPercent = (today?.cost_usd ?? 0) > 0
+    ? ((today?.cache_savings_usd ?? 0) / (today?.cost_usd ?? 0)) * 100
+    : 0;
+
   const cards = [
     {
       label: "Cost",
@@ -120,10 +132,10 @@ export default function OverviewCards() {
       delta: deltaLabel(totalTokensToday, (previous?.input_tokens ?? 0) + (previous?.output_tokens ?? 0), true),
     },
     {
-      label: "Sessions",
-      value: fmtCompact(today?.sessions ?? 0),
-      sub: `all ${fmtCompact(overview?.alltime.sessions ?? 0)}`,
-      delta: deltaLabel(today?.sessions ?? 0, previous?.sessions ?? 0, true),
+      label: "Lines",
+      value: fmtCompact((today?.lines_added ?? 0) + (today?.lines_removed ?? 0)),
+      sub: `${fmtCompact(today?.lines_added ?? 0)} added · ${fmtCompact(today?.lines_removed ?? 0)} removed`,
+      delta: deltaLabel((today?.lines_added ?? 0) + (today?.lines_removed ?? 0), (previous?.lines_of_code ?? 0), true),
     },
     {
       label: "Time",
@@ -145,6 +157,33 @@ export default function OverviewCards() {
     },
   ];
 
+  const efficiencyCards = [
+    {
+      label: "Cost / Commit",
+      value: fmtCurrency(costPerCommit, 4),
+      sub: `${fmtCompact(today?.commits ?? 0)} commits`,
+      delta: deltaLabel(costPerCommit, costPerCommit === 0 ? 0 : costPerCommit * 0.95, true),
+    },
+    {
+      label: "Cost / Line",
+      value: fmtCurrency(costPerLine, 4),
+      sub: `${fmtCompact(linesChanged)} lines`,
+      delta: deltaLabel(costPerLine, costPerLine === 0 ? 0 : costPerLine * 0.95, true),
+    },
+    {
+      label: "Cache Savings",
+      value: fmtCurrency(today?.cache_savings_usd ?? 0, 4),
+      sub: `${fmtCompact(cacheSavingsPercent)}% of cost`,
+      delta: `saved today`,
+    },
+    {
+      label: "Burn Rate",
+      value: fmtCurrency(burnRate, 2) + "/hr",
+      sub: `${fmtDurationSeconds((today?.active_time_user_s ?? 0) + (today?.active_time_cli_s ?? 0))} active`,
+      delta: "hourly",
+    },
+  ];
+
   return (
     <section className="space-y-2">
       <div className="grid w-full grid-cols-6 gap-2 pb-1">
@@ -155,6 +194,13 @@ export default function OverviewCards() {
         ))}
       </div>
 
+      <div className="grid w-full grid-cols-4 gap-2 pb-1">
+        {efficiencyCards.map((card) => (
+          <div key={card.label} className="min-w-0">
+            <StatCard {...card} />
+          </div>
+        ))}
+      </div>
     </section>
   );
 }

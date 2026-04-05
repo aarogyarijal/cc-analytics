@@ -10,6 +10,7 @@ import {
   Legend,
 } from "recharts";
 import { fmtCompact, fmtCurrency, fmtPercent, shortId } from "../lib/format";
+import { calculateCacheSavings } from "../lib/pricing";
 
 type ModelRow = {
   model: string;
@@ -18,6 +19,7 @@ type ModelRow = {
   cache_read_tokens: number;
   cache_creation_tokens: number;
   cost_usd: number;
+  cache_savings_usd?: number;
   request_count: number;
   error_count: number;
   avg_duration_ms: number;
@@ -108,26 +110,36 @@ export default function ModelBreakdown() {
                   <th className="px-3 py-2.5 text-right font-medium">Cache</th>
                   <th className="px-3 py-2.5 text-right font-medium">Out/In</th>
                   <th className="px-3 py-2.5 text-right font-medium">Err</th>
-                  <th className="px-3 py-2.5 text-right font-medium">$/req</th>
+                  <th className="px-3 py-2.5 text-right font-medium">Thrpt</th>
+                  <th className="px-3 py-2.5 text-right font-medium">Saved</th>
+                  <th className="px-3 py-2.5 text-right font-medium">Adj $/req</th>
                 </tr>
               </thead>
               <tbody>
-                {data.map((row) => (
-                  <tr key={row.model} className="border-t border-white/10 hover:bg-white/5">
-                    <td className="px-3 py-2.5 text-slate-100">{shortId(row.model, 12, 6).replace("claude-", "")}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-slate-200">{fmtCompact(row.request_count)}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-amber-300">{fmtCurrency(row.cost_usd, 4)}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-emerald-300">{fmtPercent(row.cache_hit_rate)}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-sky-300">{row.output_input_ratio.toFixed(2)}x</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-rose-300">{fmtPercent(row.error_rate)}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-slate-300">
-                      {fmtCurrency(row.cost_per_request_usd, 4)}
-                    </td>
-                  </tr>
-                ))}
+                {data.map((row) => {
+                  const throughput = row.avg_duration_ms > 0 ? (row.output_tokens / (row.avg_duration_ms / 1000)).toFixed(1) : "0";
+                  const cacheSavings = row.cache_savings_usd ?? calculateCacheSavings(row.model, row.cache_read_tokens, row.cost_usd / Math.max(row.input_tokens + row.cache_read_tokens, 1) * 1_000_000);
+                  const adjCostPerReq = row.error_rate > 0 && row.error_rate < 1
+                    ? row.cost_per_request_usd / (1 - row.error_rate)
+                    : row.cost_per_request_usd;
+
+                  return (
+                    <tr key={row.model} className="border-t border-white/10 hover:bg-white/5">
+                      <td className="px-3 py-2.5 text-slate-100">{shortId(row.model, 12, 6).replace("claude-", "")}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-slate-200">{fmtCompact(row.request_count)}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-amber-300">{fmtCurrency(row.cost_usd, 4)}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-emerald-300">{fmtPercent(row.cache_hit_rate)}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-sky-300">{row.output_input_ratio.toFixed(2)}x</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-rose-300">{fmtPercent(row.error_rate)}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-sky-300">{throughput} tok/s</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-emerald-300">{fmtCurrency(cacheSavings, 4)}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-amber-300">{fmtCurrency(adjCostPerReq, 4)}</td>
+                    </tr>
+                  );
+                })}
                 {data.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-3 py-6 text-center text-slate-500">
+                    <td colSpan={9} className="px-3 py-6 text-center text-slate-500">
                       No data
                     </td>
                   </tr>

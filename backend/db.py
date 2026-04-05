@@ -31,6 +31,15 @@ CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id);
 CREATE INDEX IF NOT EXISTS idx_events_name    ON events(event_name, ts DESC);
 """
 
+# Model pricing: input and cache_read prices per million tokens
+MODEL_PRICING = {
+    "claude-sonnet-4-6":   {"input_per_mtok": 3.0, "cache_read_per_mtok": 0.30},
+    "claude-opus-4-6":     {"input_per_mtok": 15.0, "cache_read_per_mtok": 1.50},
+    "claude-haiku-4-5":    {"input_per_mtok": 0.80, "cache_read_per_mtok": 0.08},
+    "claude-3-5-sonnet":   {"input_per_mtok": 3.0, "cache_read_per_mtok": 0.30},
+    "claude-3-opus":       {"input_per_mtok": 15.0, "cache_read_per_mtok": 1.50},
+}
+
 
 def get_conn() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
@@ -106,6 +115,8 @@ def _empty_daily_row(date: str) -> dict:
         "api_requests": 0,
         "api_errors": 0,
         "api_avg_duration_ms": 0,
+        "tool_calls": 0,
+        "rolling_7d_cost_usd": 0,
     }
 
 
@@ -201,10 +212,33 @@ def query_overview() -> dict:
             "SELECT COUNT(*) AS cnt FROM events WHERE event_name='api_error'"
         ).fetchone()["cnt"] or 0
 
+        cache_read_by_model = conn.execute(
+            """
+            SELECT json_extract(labels,'$.model') AS model, SUM(value) AS total
+            FROM metrics
+            WHERE name='claude_code.token.usage' AND json_extract(labels,'$.type')='cacheRead' AND ts >= ?
+            GROUP BY model
+            """,
+            (since,),
+        ).fetchall()
+
     tool_result_total = tool_result_counts["total_count"] or 0
     tool_success_rate = (
         (tool_result_counts["success_count"] or 0) / tool_result_total if tool_result_total > 0 else 0
     )
+
+    # Calculate cache savings for today
+    cache_savings_usd = 0.0
+    for r in cache_read_by_model:
+        model = r["model"]
+        cache_read_tokens = r["total"] or 0
+        pricing = MODEL_PRICING.get(model, {})
+        if pricing and "input_per_mtok" in pricing and "cache_read_per_mtok" in pricing:
+            price_delta = pricing["input_per_mtok"] - pricing["cache_read_per_mtok"]
+            cache_savings_usd += cache_read_tokens * price_delta / 1_000_000
+        else:
+            # Fallback: assume 90% discount
+            cache_savings_usd += cache_read_tokens * cost_usd / max(tokens.get("input", 1) + cache_read_tokens, 1) * 0.9 / 1_000_000
 
     return {
         "today": {
@@ -213,6 +247,7 @@ def query_overview() -> dict:
             "cache_read_tokens": tokens.get("cacheRead", 0),
             "cache_creation_tokens": tokens.get("cacheCreation", 0),
             "cost_usd": round(cost_usd, 6),
+            "cache_savings_usd": round(cache_savings_usd, 6),
             "sessions": sessions_today,
             "active_time_user_s": active_time.get("user", 0),
             "active_time_cli_s": active_time.get("cli", 0),
@@ -338,6 +373,16 @@ def query_daily(days: int = 30) -> list[dict]:
             (since,),
         ).fetchall()
 
+        tool_result_rows = conn.execute(
+            """
+            SELECT date(ts/1000,'unixepoch') AS date, COUNT(*) AS cnt
+            FROM events
+            WHERE event_name='tool_result' AND ts >= ?
+            GROUP BY date ORDER BY date
+            """,
+            (since,),
+        ).fetchall()
+
     by_date: dict[str, dict] = {}
 
     for r in token_rows:
@@ -380,7 +425,16 @@ def query_daily(days: int = 30) -> list[dict]:
     for r in api_error_rows:
         by_date.setdefault(r["date"], _empty_daily_row(r["date"]))["api_errors"] = r["cnt"] or 0
 
-    return sorted(by_date.values(), key=lambda x: x["date"])
+    for r in tool_result_rows:
+        by_date.setdefault(r["date"], _empty_daily_row(r["date"]))["tool_calls"] = r["cnt"] or 0
+
+    # Sort and compute rolling 7-day average cost
+    sorted_rows = sorted(by_date.values(), key=lambda x: x["date"])
+    for i, row in enumerate(sorted_rows):
+        window = sorted_rows[max(0, i - 6):i + 1]
+        row["rolling_7d_cost_usd"] = round(sum(r["cost_usd"] for r in window) / len(window), 6)
+
+    return sorted_rows
 
 
 def query_models() -> list[dict]:
@@ -466,6 +520,18 @@ def query_models() -> list[dict]:
         m["output_input_ratio"] = round(m["output_tokens"] / m["input_tokens"], 4) if m["input_tokens"] > 0 else 0
         m["cost_per_request_usd"] = round(m["cost_usd"] / m["request_count"], 6) if m["request_count"] > 0 else 0
         m["error_rate"] = round(m["error_count"] / m["request_count"], 4) if m["request_count"] > 0 else 0
+
+        # Calculate cache savings based on model pricing
+        pricing = MODEL_PRICING.get(m["model"], {})
+        if pricing and "input_per_mtok" in pricing and "cache_read_per_mtok" in pricing:
+            input_price = pricing["input_per_mtok"]
+            cache_price = pricing["cache_read_per_mtok"]
+            price_delta = input_price - cache_price
+            m["cache_savings_usd"] = round(m["cache_read_tokens"] * price_delta / 1_000_000, 6)
+        else:
+            # Fallback: assume 90% discount on blended rate
+            blended_rate = m["cost_usd"] / (m["input_tokens"] + m["cache_read_tokens"] + m["cache_creation_tokens"] + 1) * 1_000_000
+            m["cache_savings_usd"] = round(m["cache_read_tokens"] * blended_rate * 0.9 / 1_000_000, 6)
 
     return sorted(by_model.values(), key=lambda x: x["cost_usd"], reverse=True)
 
@@ -569,7 +635,7 @@ def query_sessions(limit: int = 50) -> list[dict]:
               GROUP BY session_id
             ),
             session_metrics AS (
-              SELECT json_extract(labels,'$.session.id') AS session_id,
+              SELECT json_extract(labels,'$."session.id"') AS session_id,
                      SUM(CASE WHEN name='claude_code.cost.usage' THEN value ELSE 0 END) AS cost_usd,
                      SUM(CASE WHEN name='claude_code.token.usage' AND json_extract(labels,'$.type')='input' THEN value ELSE 0 END) AS input_tokens,
                      SUM(CASE WHEN name='claude_code.token.usage' AND json_extract(labels,'$.type')='output' THEN value ELSE 0 END) AS output_tokens,
@@ -582,7 +648,7 @@ def query_sessions(limit: int = 50) -> list[dict]:
                      SUM(CASE WHEN name='claude_code.commit.count' THEN value ELSE 0 END) AS commits,
                      SUM(CASE WHEN name='claude_code.pull_request.count' THEN value ELSE 0 END) AS pull_requests
               FROM metrics
-              WHERE json_extract(labels,'$.session.id') IS NOT NULL
+              WHERE json_extract(labels,'$."session.id"') IS NOT NULL
               GROUP BY session_id
             )
             SELECT
@@ -682,3 +748,166 @@ def query_errors(limit: int = 25) -> list[dict]:
         }
         for r in rows
     ]
+
+
+def query_hourly(hours: int = 24) -> list[dict]:
+    """Return hourly aggregations for the last N hours."""
+    since = int(time.time() * 1000) - hours * 3_600_000
+    with conn_ctx() as conn:
+        # Get hourly tokens
+        token_rows = conn.execute(
+            """
+            SELECT strftime('%Y-%m-%d %H:00', datetime(ts/1000, 'unixepoch')) AS hour,
+                   json_extract(labels,'$.type') AS type,
+                   SUM(value) AS total
+            FROM metrics
+            WHERE name='claude_code.token.usage' AND ts >= ?
+            GROUP BY hour, type
+            ORDER BY hour
+            """,
+            (since,),
+        ).fetchall()
+
+        # Get hourly cost
+        cost_rows = conn.execute(
+            """
+            SELECT strftime('%Y-%m-%d %H:00', datetime(ts/1000, 'unixepoch')) AS hour,
+                   SUM(value) AS total
+            FROM metrics
+            WHERE name='claude_code.cost.usage' AND ts >= ?
+            GROUP BY hour ORDER BY hour
+            """,
+            (since,),
+        ).fetchall()
+
+        # Get hourly api_requests
+        api_rows = conn.execute(
+            """
+            SELECT strftime('%Y-%m-%d %H:00', datetime(ts/1000, 'unixepoch')) AS hour,
+                   COUNT(*) AS cnt
+            FROM events
+            WHERE event_name='api_request' AND ts >= ?
+            GROUP BY hour ORDER BY hour
+            """,
+            (since,),
+        ).fetchall()
+
+        # Get hourly api_errors
+        error_rows = conn.execute(
+            """
+            SELECT strftime('%Y-%m-%d %H:00', datetime(ts/1000, 'unixepoch')) AS hour,
+                   COUNT(*) AS cnt
+            FROM events
+            WHERE event_name='api_error' AND ts >= ?
+            GROUP BY hour ORDER BY hour
+            """,
+            (since,),
+        ).fetchall()
+
+        # Get hourly lines_of_code
+        line_rows = conn.execute(
+            """
+            SELECT strftime('%Y-%m-%d %H:00', datetime(ts/1000, 'unixepoch')) AS hour,
+                   json_extract(labels,'$.type') AS type,
+                   SUM(value) AS total
+            FROM metrics
+            WHERE name='claude_code.lines_of_code.count' AND ts >= ?
+            GROUP BY hour, type
+            ORDER BY hour
+            """,
+            (since,),
+        ).fetchall()
+
+        # Get hourly tool_calls
+        tool_rows = conn.execute(
+            """
+            SELECT strftime('%Y-%m-%d %H:00', datetime(ts/1000, 'unixepoch')) AS hour,
+                   COUNT(*) AS cnt
+            FROM events
+            WHERE event_name='tool_result' AND ts >= ?
+            GROUP BY hour ORDER BY hour
+            """,
+            (since,),
+        ).fetchall()
+
+    by_hour: dict[str, dict] = {}
+
+    for r in token_rows:
+        h = by_hour.setdefault(r["hour"], {
+            "hour": r["hour"],
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "cache_read_tokens": 0,
+            "cache_creation_tokens": 0,
+            "cost_usd": 0,
+            "api_requests": 0,
+            "api_errors": 0,
+            "lines_of_code": 0,
+            "tool_calls": 0,
+        })
+        key = {"input": "input_tokens", "output": "output_tokens",
+               "cacheRead": "cache_read_tokens", "cacheCreation": "cache_creation_tokens"}.get(r["type"])
+        if key:
+            h[key] += r["total"] or 0
+
+    for r in cost_rows:
+        by_hour.setdefault(r["hour"], {"hour": r["hour"]})["cost_usd"] = round(r["total"] or 0, 6)
+
+    for r in api_rows:
+        by_hour.setdefault(r["hour"], {"hour": r["hour"]})["api_requests"] = r["cnt"] or 0
+
+    for r in error_rows:
+        by_hour.setdefault(r["hour"], {"hour": r["hour"]})["api_errors"] = r["cnt"] or 0
+
+    for r in line_rows:
+        h = by_hour.setdefault(r["hour"], {"hour": r["hour"]})
+        if r["type"] == "added":
+            h["lines_of_code"] = (h.get("lines_of_code", 0) or 0) + (r["total"] or 0)
+        elif r["type"] == "removed":
+            h["lines_of_code"] = (h.get("lines_of_code", 0) or 0) + (r["total"] or 0)
+
+    for r in tool_rows:
+        by_hour.setdefault(r["hour"], {"hour": r["hour"]})["tool_calls"] = r["cnt"] or 0
+
+    return sorted(by_hour.values(), key=lambda x: x["hour"])
+
+
+def query_dow_patterns() -> list[dict]:
+    """Return day-of-week aggregations (0=Sun to 6=Sat) with cost and productivity metrics."""
+    with conn_ctx() as conn:
+        dow_rows = conn.execute(
+            """
+            SELECT strftime('%w', date(ts/1000,'unixepoch')) AS dow,
+                   COUNT(DISTINCT date(ts/1000,'unixepoch')) AS day_count,
+                   ROUND(SUM(CASE WHEN name='claude_code.cost.usage' THEN value ELSE 0 END) /
+                         NULLIF(COUNT(DISTINCT date(ts/1000,'unixepoch')), 0), 6) AS avg_cost_usd,
+                   ROUND(SUM(CASE WHEN name='claude_code.lines_of_code.count' THEN value ELSE 0 END) /
+                         NULLIF(COUNT(DISTINCT date(ts/1000,'unixepoch')), 0), 0) AS avg_lines,
+                   ROUND(SUM(CASE WHEN name='claude_code.commit.count' THEN value ELSE 0 END) /
+                         NULLIF(COUNT(DISTINCT date(ts/1000,'unixepoch')), 0), 2) AS avg_commits,
+                   ROUND(COUNT(CASE WHEN event_name='api_request' THEN 1 END) /
+                         NULLIF(COUNT(DISTINCT date(ts/1000,'unixepoch')), 0), 0) AS avg_api_requests
+            FROM (
+              SELECT ts, name, value, NULL AS event_name FROM metrics
+              UNION ALL
+              SELECT ts, NULL, NULL, event_name FROM events
+            )
+            GROUP BY dow
+            ORDER BY dow
+            """
+        ).fetchall()
+
+    result = []
+    day_names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+    for r in dow_rows:
+        dow_idx = int(r["dow"] or 0)
+        result.append({
+            "dow": dow_idx,
+            "day_name": day_names[dow_idx],
+            "day_count": int(r["day_count"] or 0),
+            "avg_cost_usd": round(r["avg_cost_usd"] or 0, 6),
+            "avg_lines": int(r["avg_lines"] or 0),
+            "avg_commits": round(r["avg_commits"] or 0, 2),
+            "avg_api_requests": int(r["avg_api_requests"] or 0),
+        })
+    return sorted(result, key=lambda x: x["dow"])

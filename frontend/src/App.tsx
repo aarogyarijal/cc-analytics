@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import OverviewCards from "./components/OverviewCards";
 import DailyChart from "./components/DailyChart";
+import InsightsRow from "./components/InsightsRow";
 import ModelBreakdown from "./components/ModelBreakdown";
 import ToolTable from "./components/ToolTable";
 import EditDecisions from "./components/EditDecisions";
@@ -39,6 +40,8 @@ export default function App() {
               <LiveFeed />
             </div>
           </div>
+
+          <InsightsRow />
 
           <ModelBreakdown />
 

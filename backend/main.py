@@ -120,6 +120,16 @@ def get_errors(limit: int = Query(default=25, ge=1, le=100)):
     return db.query_errors(limit)
 
 
+@app.get("/api/patterns")
+def get_patterns():
+    return db.query_dow_patterns()
+
+
+@app.get("/api/hourly")
+def get_hourly(hours: int = Query(default=24, ge=1, le=72)):
+    return db.query_hourly(hours)
+
+
 # ── SSE live feed ──────────────────────────────────────────────────────────────
 
 @app.get("/api/live")
