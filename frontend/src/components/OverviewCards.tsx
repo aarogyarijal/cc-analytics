@@ -46,33 +46,6 @@ type DayRow = {
   api_avg_duration_ms: number;
 };
 
-function Sparkline({ values, accent }: { values: number[]; accent: string }) {
-  const width = 120;
-  const height = 36;
-  const max = Math.max(...values, 1);
-  const min = Math.min(...values, 0);
-  const points = values
-    .map((value, index) => {
-      const x = values.length === 1 ? width / 2 : (index / Math.max(values.length - 1, 1)) * width;
-      const y = height - ((value - min) / Math.max(max - min, 1)) * (height - 4) - 2;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
-
-  return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="h-9 w-28 shrink-0 overflow-visible">
-      <polyline
-        fill="none"
-        stroke={accent}
-        strokeWidth="2.25"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        points={points}
-      />
-    </svg>
-  );
-}
-
 function deltaLabel(current: number, previous: number, percent = false) {
   if (previous === 0) {
     return current === 0 ? "flat" : "new";
@@ -88,28 +61,19 @@ function StatCard({
   value,
   sub,
   delta,
-  trend,
-  accent,
 }: {
   label: string;
   value: string;
   sub: string;
   delta: string;
-  trend: number[];
-  accent: string;
 }) {
   return (
     <div className="h-[146px] w-fit rounded-2xl border border-white/10 bg-white/5 p-3 shadow-[0_20px_50px_rgba(2,6,23,0.22)] backdrop-blur-md">
       <div className="flex h-full flex-col justify-between gap-2">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">{label}</p>
-            <p className="mt-1.5 text-xl font-semibold tracking-tight text-slate-50">{value}</p>
-            <p className="mt-1 whitespace-nowrap text-[11px] leading-none text-slate-400">{sub}</p>
-          </div>
-          <div className="pt-0.5">
-            <Sparkline values={trend} accent={accent} />
-          </div>
+        <div className="w-fit">
+          <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">{label}</p>
+          <p className="mt-1.5 text-xl font-semibold tracking-tight text-slate-50">{value}</p>
+          <p className="mt-1 whitespace-nowrap text-[11px] leading-none text-slate-400">{sub}</p>
         </div>
         <div className="inline-flex w-fit rounded-full border border-white/10 bg-black/20 px-2 py-0.5 text-[10px] text-slate-300">
           {delta}
@@ -148,51 +112,36 @@ export default function OverviewCards() {
       value: fmtCurrency(today?.cost_usd ?? 0, 4),
       sub: `all ${fmtCurrency(overview?.alltime.cost_usd ?? 0, 2)}`,
       delta: deltaLabel(today?.cost_usd ?? 0, previous?.cost_usd ?? 0, true),
-      trend: daily.map((d) => d.cost_usd),
-      accent: "#f59e0b",
     },
     {
       label: "Tokens",
       value: fmtCompact(totalTokensToday),
       sub: `${fmtCompact(today?.input_tokens ?? 0)} in · ${fmtCompact(today?.output_tokens ?? 0)} out`,
       delta: deltaLabel(totalTokensToday, (previous?.input_tokens ?? 0) + (previous?.output_tokens ?? 0), true),
-      trend: daily.map((d) => d.input_tokens + d.output_tokens),
-      accent: "#60a5fa",
     },
     {
       label: "Sessions",
       value: fmtCompact(today?.sessions ?? 0),
       sub: `all ${fmtCompact(overview?.alltime.sessions ?? 0)}`,
       delta: deltaLabel(today?.sessions ?? 0, previous?.sessions ?? 0, true),
-      trend: daily.map((d) => d.sessions),
-      accent: "#34d399",
     },
     {
       label: "Time",
       value: fmtDurationSeconds(activeSeconds),
       sub: `${fmtDurationSeconds(today?.active_time_user_s ?? 0)} typing · ${fmtDurationSeconds(today?.active_time_cli_s ?? 0)} CLI`,
       delta: "active",
-      trend: daily.map((d) => d.active_time_user_s + d.active_time_cli_s),
-      accent: "#c084fc",
     },
     {
       label: "Success",
       value: fmtPercent(today?.tool_success_rate ?? 0),
       sub: `${fmtCompact(today?.api_requests ?? 0)} req · ${fmtCompact(today?.api_errors ?? 0)} err`,
       delta: `${fmtCompact(overview?.alltime.api_errors ?? 0)} err`,
-      trend: daily.map((d) => (d.api_requests > 0 ? (d.api_requests - d.api_errors) / d.api_requests : 0)),
-      accent: "#22c55e",
     },
     {
       label: "Cache",
       value: fmtPercent(cacheHits),
       sub: `${fmtCompact(today?.cache_read_tokens ?? 0)} read · ${fmtCompact(today?.cache_creation_tokens ?? 0)} create`,
       delta: "cache",
-      trend: daily.map((d) => {
-        const total = d.input_tokens + d.cache_read_tokens + d.cache_creation_tokens;
-        return total > 0 ? d.cache_read_tokens / total : 0;
-      }),
-      accent: "#38bdf8",
     },
   ];
 
