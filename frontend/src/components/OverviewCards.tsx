@@ -99,16 +99,18 @@ function StatCard({
   accent: string;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-[0_20px_50px_rgba(2,6,23,0.22)] backdrop-blur-md">
-      <div className="flex items-start justify-between gap-3">
+    <div className="min-w-0 rounded-2xl border border-white/10 bg-white/5 p-3 shadow-[0_20px_50px_rgba(2,6,23,0.22)] backdrop-blur-md">
+      <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.24em] text-slate-400">{label}</p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-50">{value}</p>
-          <p className="mt-1 text-xs text-slate-400">{sub}</p>
+          <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">{label}</p>
+          <p className="mt-1.5 text-xl font-semibold tracking-tight text-slate-50">{value}</p>
+          <p className="mt-1 text-[11px] leading-tight text-slate-400">{sub}</p>
         </div>
-        <Sparkline values={trend} accent={accent} />
+        <div className="pt-0.5">
+          <Sparkline values={trend} accent={accent} />
+        </div>
       </div>
-      <div className="mt-3 inline-flex rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-[11px] text-slate-300">
+      <div className="mt-2 inline-flex rounded-full border border-white/10 bg-black/20 px-2 py-0.5 text-[10px] text-slate-300">
         {delta}
       </div>
     </div>
@@ -196,13 +198,13 @@ export default function OverviewCards() {
   ];
 
   return (
-    <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+    <section className="grid gap-2 md:grid-cols-2 xl:grid-cols-6">
       {cards.map((card) => (
         <StatCard key={card.label} {...card} />
       ))}
 
-      <div className="sm:col-span-2 lg:col-span-3 xl:col-span-6 rounded-2xl border border-cyan-400/15 bg-gradient-to-r from-cyan-400/10 via-slate-950 to-amber-400/10 p-3 shadow-[0_20px_50px_rgba(2,6,23,0.22)] backdrop-blur-md">
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="md:col-span-2 xl:col-span-6 rounded-2xl border border-cyan-400/15 bg-gradient-to-r from-cyan-400/10 via-slate-950 to-amber-400/10 p-3 shadow-[0_20px_50px_rgba(2,6,23,0.22)] backdrop-blur-md">
+        <div className="flex flex-wrap items-center gap-2">
           <div>
             <p className="text-[11px] uppercase tracking-[0.24em] text-slate-400">Signal summary</p>
             <h2 className="mt-1 text-base font-semibold text-slate-50">What the current telemetry says</h2>
