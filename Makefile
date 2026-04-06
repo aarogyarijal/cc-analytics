@@ -7,12 +7,12 @@ UVICORN := $(VENV)/bin/uvicorn
 # Start both backend and frontend
 dev: $(VENV)
 	@trap 'kill %1 %2 2>/dev/null; exit' INT; \
-	PYTHONPATH=backend $(UVICORN) backend.main:app --host 0.0.0.0 --port 8000 --reload & \
+	PYTHONPATH=backend $(UVICORN) backend.main:app --host 0.0.0.0 --port 6767 --reload & \
 	cd frontend && npm run dev & \
 	wait
 
 backend: $(VENV)
-	PYTHONPATH=backend $(UVICORN) backend.main:app --host 0.0.0.0 --port 8000 --reload
+	PYTHONPATH=backend $(UVICORN) backend.main:app --host 0.0.0.0 --port 6767 --reload
 
 frontend:
 	cd frontend && npm run dev
@@ -37,7 +37,7 @@ setup-shell:
 		echo "export OTEL_METRICS_EXPORTER=otlp" >> ~/.zshrc; \
 		echo "export OTEL_LOGS_EXPORTER=otlp" >> ~/.zshrc; \
 		echo "export OTEL_EXPORTER_OTLP_PROTOCOL=http/json" >> ~/.zshrc; \
-		echo "export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:8000" >> ~/.zshrc; \
+		echo "export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:6767" >> ~/.zshrc; \
 		echo "export OTEL_METRIC_EXPORT_INTERVAL=15000" >> ~/.zshrc; \
 		echo "export OTEL_LOGS_EXPORT_INTERVAL=5000" >> ~/.zshrc; \
 		echo "export OTEL_LOG_TOOL_DETAILS=1" >> ~/.zshrc; \

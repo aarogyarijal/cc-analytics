@@ -1,0 +1,3 @@
+backend/analytics.db
+backend/__pycache__/
+.gstack/
