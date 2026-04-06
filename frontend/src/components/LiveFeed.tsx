@@ -103,15 +103,15 @@ function EventRow({ ev }: { ev: LiveEvent }) {
   const isError = ev.type === "api_error" || (ev.type === "tool_result" && ev.attrs?.success === "false");
 
   return (
-    <div className={`rounded-lg border ${meta.border} ${meta.bg} px-2.5 py-2 text-[11px] ${isError ? "ring-1 ring-rose-500/30" : ""}`}>
-      <div className="flex items-center gap-2">
+    <div className={`min-w-0 overflow-hidden rounded-lg border ${meta.border} ${meta.bg} px-2.5 py-2 text-[11px] ${isError ? "ring-1 ring-rose-500/30" : ""}`}>
+      <div className="flex min-w-0 items-center gap-2">
         <span className={`flex h-1.5 w-1.5 flex-shrink-0 rounded-full ${meta.dot}`} />
         <span className="flex-shrink-0 tabular-nums text-slate-500">{timeStr(ev.receivedAt)}</span>
         <span className={`flex-shrink-0 w-14 font-semibold uppercase tracking-wide text-[9px] ${meta.accent}`}>{meta.label}</span>
         <span className="min-w-0 flex-1 truncate font-mono text-slate-200">{primary}</span>
       </div>
       {detail && (
-        <p className="mt-0.5 pl-[calc(6px+8px+28px+56px)] font-mono text-[10px] text-slate-500 truncate">{detail}</p>
+        <p className="mt-0.5 pl-[calc(6px+8px+28px+56px)] min-w-0 overflow-hidden font-mono text-[10px] text-slate-500 truncate">{detail}</p>
       )}
     </div>
   );
@@ -159,7 +159,7 @@ export default function LiveFeed() {
       <div
         ref={containerRef}
         onScroll={onScroll}
-        className="flex-1 overflow-y-auto p-2 space-y-1 min-h-0"
+        className="flex-1 overflow-y-auto overflow-x-hidden p-2 space-y-1 min-h-0"
       >
         {events.length === 0 ? (
           <div className="flex h-full min-h-[360px] items-center justify-center">
