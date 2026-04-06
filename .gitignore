@@ -1,3 +1,5 @@
 backend/analytics.db
+backend/analytics.db-shm
+backend/analytics.db-wal
 backend/__pycache__/
 .gstack/

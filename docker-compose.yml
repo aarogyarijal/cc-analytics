@@ -5,7 +5,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "6767:6767"
+      - "127.0.0.1:6767:6767"
     environment:
       CC_ANALYTICS_DB_PATH: /data/analytics.db
       PORT: "6767"
