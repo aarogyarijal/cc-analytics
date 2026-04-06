@@ -1,4 +1,3 @@
-import { useEffect, useRef } from "react";
 import { useLiveFeed, type LiveEvent } from "../hooks/useLiveFeed";
 import { fmtCompact, fmtCurrency, fmtDurationMs, shortId } from "../lib/format";
 
@@ -155,22 +154,6 @@ function EventRow({ ev }: { ev: LiveEvent }) {
 
 export default function LiveFeed() {
   const { events, connected } = useLiveFeed();
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const atBottomRef = useRef(true);
-
-  // Auto-scroll to bottom only if already pinned there
-  useEffect(() => {
-    if (atBottomRef.current) {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [events]);
-
-  function onScroll() {
-    const el = containerRef.current;
-    if (!el) return;
-    atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
-  }
 
   return (
     <aside className="w-full overflow-hidden flex flex-col rounded-2xl border border-white/10 bg-slate-950/85 shadow-[0_20px_50px_rgba(2,6,23,0.28)] backdrop-blur-md" style={{ height: "100%", minHeight: 420, maxHeight: 720 }}>
@@ -192,20 +175,13 @@ export default function LiveFeed() {
         </div>
       </div>
 
-      <div
-        ref={containerRef}
-        onScroll={onScroll}
-        className="flex-1 overflow-y-auto overflow-x-hidden p-2 space-y-1 min-h-0"
-      >
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-2 space-y-1 min-h-0">
         {events.length === 0 ? (
           <div className="flex h-full min-h-[360px] items-center justify-center">
             <p className="text-xs text-slate-500">Waiting for events…</p>
           </div>
         ) : (
-          <>
-            {[...events].reverse().map((ev, i) => <EventRow key={i} ev={ev} />)}
-            <div ref={bottomRef} />
-          </>
+          events.map((ev, i) => <EventRow key={i} ev={ev} />)
         )}
       </div>
     </aside>
