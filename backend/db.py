@@ -970,6 +970,104 @@ def query_30min(hours: int = 24) -> list[dict]:
     return sorted(by_interval.values(), key=lambda x: x["hour"])
 
 
+def query_interval(interval_hours: float, total_hours: int) -> list[dict]:
+    """Return aggregations bucketed by interval_hours for the last total_hours hours.
+
+    Uses epoch-division bucketing so any interval size works:
+      bucket_epoch = (ts_seconds / interval_seconds) * interval_seconds
+    Then formatted in localtime.
+    """
+    since = int(time.time() * 1000) - int(total_hours * 3_600_000)
+    interval_secs = int(interval_hours * 3600)
+    with conn_ctx() as conn:
+        token_rows = conn.execute(
+            """
+            SELECT strftime('%Y-%m-%d %H:%M', datetime((ts/1000 / ?) * ?, 'unixepoch', 'localtime')) AS bucket,
+                   json_extract(labels,'$.type') AS type,
+                   SUM(value) AS total
+            FROM metrics
+            WHERE name='claude_code.token.usage' AND ts >= ?
+            GROUP BY bucket, type ORDER BY bucket
+            """,
+            (interval_secs, interval_secs, since),
+        ).fetchall()
+        cost_rows = conn.execute(
+            """
+            SELECT strftime('%Y-%m-%d %H:%M', datetime((ts/1000 / ?) * ?, 'unixepoch', 'localtime')) AS bucket,
+                   SUM(value) AS total
+            FROM metrics
+            WHERE name='claude_code.cost.usage' AND ts >= ?
+            GROUP BY bucket ORDER BY bucket
+            """,
+            (interval_secs, interval_secs, since),
+        ).fetchall()
+        api_rows = conn.execute(
+            """
+            SELECT strftime('%Y-%m-%d %H:%M', datetime((ts/1000 / ?) * ?, 'unixepoch', 'localtime')) AS bucket,
+                   COUNT(*) AS cnt
+            FROM events
+            WHERE event_name='api_request' AND ts >= ?
+            GROUP BY bucket ORDER BY bucket
+            """,
+            (interval_secs, interval_secs, since),
+        ).fetchall()
+        error_rows = conn.execute(
+            """
+            SELECT strftime('%Y-%m-%d %H:%M', datetime((ts/1000 / ?) * ?, 'unixepoch', 'localtime')) AS bucket,
+                   COUNT(*) AS cnt
+            FROM events
+            WHERE event_name='api_error' AND ts >= ?
+            GROUP BY bucket ORDER BY bucket
+            """,
+            (interval_secs, interval_secs, since),
+        ).fetchall()
+        line_rows = conn.execute(
+            """
+            SELECT strftime('%Y-%m-%d %H:%M', datetime((ts/1000 / ?) * ?, 'unixepoch', 'localtime')) AS bucket,
+                   json_extract(labels,'$.type') AS type,
+                   SUM(value) AS total
+            FROM metrics
+            WHERE name='claude_code.lines_of_code.count' AND ts >= ?
+            GROUP BY bucket, type ORDER BY bucket
+            """,
+            (interval_secs, interval_secs, since),
+        ).fetchall()
+        tool_rows = conn.execute(
+            """
+            SELECT strftime('%Y-%m-%d %H:%M', datetime((ts/1000 / ?) * ?, 'unixepoch', 'localtime')) AS bucket,
+                   COUNT(*) AS cnt
+            FROM events
+            WHERE event_name='tool_result' AND ts >= ?
+            GROUP BY bucket ORDER BY bucket
+            """,
+            (interval_secs, interval_secs, since),
+        ).fetchall()
+
+    by_bucket: dict[str, dict] = {}
+    for r in token_rows:
+        h = by_bucket.setdefault(r["bucket"], {
+            "hour": r["bucket"], "input_tokens": 0, "output_tokens": 0,
+            "cache_read_tokens": 0, "cache_creation_tokens": 0, "cost_usd": 0,
+            "api_requests": 0, "api_errors": 0, "lines_of_code": 0, "tool_calls": 0,
+        })
+        key = {"input": "input_tokens", "output": "output_tokens",
+               "cacheRead": "cache_read_tokens", "cacheCreation": "cache_creation_tokens"}.get(r["type"])
+        if key:
+            h[key] += r["total"] or 0
+    for r in cost_rows:
+        by_bucket.setdefault(r["bucket"], {"hour": r["bucket"]})["cost_usd"] = round(r["total"] or 0, 6)
+    for r in api_rows:
+        by_bucket.setdefault(r["bucket"], {"hour": r["bucket"]})["api_requests"] = r["cnt"] or 0
+    for r in error_rows:
+        by_bucket.setdefault(r["bucket"], {"hour": r["bucket"]})["api_errors"] = r["cnt"] or 0
+    for r in line_rows:
+        h = by_bucket.setdefault(r["bucket"], {"hour": r["bucket"]})
+        h["lines_of_code"] = (h.get("lines_of_code", 0) or 0) + (r["total"] or 0)
+    for r in tool_rows:
+        by_bucket.setdefault(r["bucket"], {"hour": r["bucket"]})["tool_calls"] = r["cnt"] or 0
+    return sorted(by_bucket.values(), key=lambda x: x["hour"])
+
+
 def query_12hourly(days: int = 7) -> list[dict]:
     """Return 12-hour interval aggregations for the last N days."""
     since = int(time.time() * 1000) - days * 86_400_000

@@ -140,19 +140,24 @@ def get_12hourly(days: int = Query(default=7, ge=1, le=30)):
     return db.query_12hourly(days)
 
 
+@app.get("/api/interval")
+def get_interval(
+    interval_hours: float = Query(default=1.0, ge=0.25, le=24),
+    total_hours: int = Query(default=24, ge=1, le=720),
+):
+    return db.query_interval(interval_hours, total_hours)
+
+
 # ── SSE live feed ──────────────────────────────────────────────────────────────
 
 @app.get("/api/live")
-async def live_feed(request: Request):
+async def live_feed():
     q: asyncio.Queue = asyncio.Queue(maxsize=200)
     _subscribers.add(q)
 
     async def generator():
         try:
-            # Send a heartbeat comment every 25s to keep the connection alive
             while True:
-                if await request.is_disconnected():
-                    break
                 try:
                     msg = await asyncio.wait_for(q.get(), timeout=25)
                     data = json.loads(msg)

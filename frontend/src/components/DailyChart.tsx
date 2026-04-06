@@ -28,6 +28,27 @@ type HourlyRow = {
   tool_calls: number;
 };
 
+type EnhancedRow = HourlyRow & {
+  cost_per_line: number;
+  lines_per_hour: number;
+};
+
+type IntervalOption = {
+  label: string;
+  interval_hours: number;
+  total_hours: number;
+};
+
+const INTERVAL_OPTIONS: IntervalOption[] = [
+  { label: "15 min · 24h",  interval_hours: 0.25, total_hours: 24  },
+  { label: "30 min · 24h",  interval_hours: 0.5,  total_hours: 24  },
+  { label: "1 hr · 48h",    interval_hours: 1,    total_hours: 48  },
+  { label: "2 hr · 3d",     interval_hours: 2,    total_hours: 72  },
+  { label: "5 hr · 7d",     interval_hours: 5,    total_hours: 168 },
+  { label: "12 hr · 14d",   interval_hours: 12,   total_hours: 336 },
+  { label: "24 hr · 30d",   interval_hours: 24,   total_hours: 720 },
+];
+
 function StatChip({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
@@ -37,42 +58,32 @@ function StatChip({ label, value }: { label: string; value: string }) {
   );
 }
 
-type EnhancedHourlyRow = HourlyRow & {
-  cost_per_line: number;
-  lines_per_hour: number;
-};
-
 function formatHourLabel(hour: string): string {
   const [date, time] = hour.split(" ");
   return `${date.slice(-2)}/${time}`;
 }
 
 export default function DailyChart() {
-  const [view, setView] = useState<"day" | "week">("week");
+  const [optionIdx, setOptionIdx] = useState(1); // default: 30 min · 24h
+  const opt = INTERVAL_OPTIONS[optionIdx];
 
-  const { data: rawDayData = [] } = useQuery<HourlyRow[]>({
-    queryKey: ["30min"],
-    queryFn: () => fetch("/api/30min?hours=24").then((r) => r.json()),
+  const { data: rawData = [] } = useQuery<HourlyRow[]>({
+    queryKey: ["interval", opt.interval_hours, opt.total_hours],
+    queryFn: () =>
+      fetch(`/api/interval?interval_hours=${opt.interval_hours}&total_hours=${opt.total_hours}`).then((r) =>
+        r.json(),
+      ),
     refetchInterval: 60_000,
-    enabled: view === "day",
   });
 
-  const { data: rawWeekData = [] } = useQuery<HourlyRow[]>({
-    queryKey: ["12hourly"],
-    queryFn: () => fetch("/api/12hourly?days=7").then((r) => r.json()),
-    refetchInterval: 60_000,
-    enabled: view === "week",
-  });
-
-  const intervalHours = view === "day" ? 0.5 : 12;
-  const data: EnhancedHourlyRow[] = (view === "day" ? rawDayData : rawWeekData).map((row) => ({
+  const data: EnhancedRow[] = rawData.map((row) => ({
     ...row,
     cost_per_line: row.lines_of_code > 0 ? row.cost_usd / row.lines_of_code : 0,
-    lines_per_hour: row.lines_of_code / intervalHours,
+    lines_per_hour: row.lines_of_code / opt.interval_hours,
   }));
 
   const totals = data.reduce(
-    (acc, row: any) => {
+    (acc, row) => {
       acc.cost += row.cost_usd;
       acc.tokens += row.input_tokens + row.output_tokens;
       acc.errors += row.api_errors ?? 0;
@@ -84,12 +95,12 @@ export default function DailyChart() {
     { cost: 0, tokens: 0, errors: 0, api_requests: 0, tool_calls: 0, lines: 0 },
   );
 
-  const latest = data.at(-1) as any;
-  const cacheShare = latest
-    ? latest.input_tokens + latest.cache_read_tokens + latest.cache_creation_tokens > 0
-      ? latest.cache_read_tokens / (latest.input_tokens + latest.cache_read_tokens + latest.cache_creation_tokens)
-      : 0
-    : 0;
+  const latest = data.at(-1);
+  const cacheShare =
+    latest && latest.input_tokens + latest.cache_read_tokens + latest.cache_creation_tokens > 0
+      ? latest.cache_read_tokens /
+        (latest.input_tokens + latest.cache_read_tokens + latest.cache_creation_tokens)
+      : 0;
 
   return (
     <section className="rounded-2xl border border-white/10 bg-slate-950/85 p-4 shadow-[0_20px_50px_rgba(2,6,23,0.28)] backdrop-blur-md">
@@ -98,28 +109,17 @@ export default function DailyChart() {
           <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Trend</p>
           <h2 className="mt-1 text-lg font-semibold text-slate-50">Usage</h2>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setView("day")}
-            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-              view === "day"
-                ? "border-white/20 bg-white/10 text-slate-50"
-                : "border-white/10 bg-white/5 text-slate-400 hover:bg-white/10"
-            }`}
-          >
-            Day
-          </button>
-          <button
-            onClick={() => setView("week")}
-            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-              view === "week"
-                ? "border-white/20 bg-white/10 text-slate-50"
-                : "border-white/10 bg-white/5 text-slate-400 hover:bg-white/10"
-            }`}
-          >
-            Week
-          </button>
-        </div>
+        <select
+          value={optionIdx}
+          onChange={(e) => setOptionIdx(Number(e.target.value))}
+          className="rounded-lg border border-white/10 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-200 focus:outline-none focus:ring-1 focus:ring-white/20"
+        >
+          {INTERVAL_OPTIONS.map((o, i) => (
+            <option key={i} value={i}>
+              {o.label}
+            </option>
+          ))}
+        </select>
         <div className="flex flex-wrap gap-2">
           <StatChip label="Cost" value={fmtCurrency(totals.cost, 2)} />
           <StatChip label="Tokens" value={fmtCompact(totals.tokens)} />
@@ -131,77 +131,55 @@ export default function DailyChart() {
       <div className="mt-4 space-y-3">
         <div className="grid gap-3 lg:grid-cols-2">
           <div className="min-w-0 rounded-xl border border-white/10 bg-white/5 p-2.5">
-            <div className="mb-2 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-semibold text-slate-100">Tokens / cost</h3>
-              </div>
-            </div>
+            <h3 className="mb-2 text-sm font-semibold text-slate-100">Tokens / cost</h3>
             <ResponsiveContainer width="100%" height={220}>
-            <ComposedChart data={data as any} margin={{ top: 6, right: 16, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
-              <XAxis dataKey="hour" tickFormatter={formatHourLabel} tick={{ fontSize: 11, fill: "#94a3b8" }} />
-              <YAxis yAxisId="tokens" tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={(v) => fmtCompact(Number(v))} />
-              <YAxis yAxisId="cost" orientation="right" tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={(v) => fmtCurrency(Number(v), 2)} />
-              <Tooltip
-                contentStyle={{
-                  background: "rgba(2, 6, 23, 0.95)",
-                  border: "1px solid rgba(148,163,184,0.18)",
-                  borderRadius: "12px",
-                  color: "#e2e8f0",
-                }}
-                labelFormatter={(label) => formatHourLabel(String(label))}
-                formatter={(value, name) => {
-                  const v = Number(value ?? 0);
-                  if (name === "cost_usd") return [fmtCurrency(v, 4), "Cost"];
-                  return [fmtCompact(v), String(name).replaceAll("_", " ")];
-                }}
-              />
-              <Legend wrapperStyle={{ color: "#cbd5e1" }} />
-              <Bar yAxisId="tokens" dataKey="input_tokens" stackId="tokens" fill="#38bdf8" name="Input tokens" />
-              <Bar yAxisId="tokens" dataKey="output_tokens" stackId="tokens" fill="#8b5cf6" name="Output tokens" />
-              <Bar yAxisId="tokens" dataKey="cache_read_tokens" stackId="tokens" fill="#22c55e" name="Cache read" />
-              <Bar yAxisId="tokens" dataKey="cache_creation_tokens" stackId="tokens" fill="#6366f1" name="Cache creation" />
-              <Line yAxisId="cost" dataKey="cost_usd" stroke="#f59e0b" strokeWidth={2.5} dot={false} name="Cost" />
-            </ComposedChart>
-          </ResponsiveContainer>
+              <ComposedChart data={data as any} margin={{ top: 6, right: 16, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
+                <XAxis dataKey="hour" tickFormatter={formatHourLabel} tick={{ fontSize: 11, fill: "#94a3b8" }} />
+                <YAxis yAxisId="tokens" tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={(v) => fmtCompact(Number(v))} />
+                <YAxis yAxisId="cost" orientation="right" tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={(v) => fmtCurrency(Number(v), 2)} />
+                <Tooltip
+                  contentStyle={{ background: "rgba(2,6,23,0.95)", border: "1px solid rgba(148,163,184,0.18)", borderRadius: "12px", color: "#e2e8f0" }}
+                  labelFormatter={(label) => formatHourLabel(String(label))}
+                  formatter={(value, name) => {
+                    const v = Number(value ?? 0);
+                    if (name === "cost_usd") return [fmtCurrency(v, 4), "Cost"];
+                    return [fmtCompact(v), String(name).replaceAll("_", " ")];
+                  }}
+                />
+                <Legend wrapperStyle={{ color: "#cbd5e1" }} />
+                <Bar yAxisId="tokens" dataKey="input_tokens" stackId="tokens" fill="#38bdf8" name="Input tokens" />
+                <Bar yAxisId="tokens" dataKey="output_tokens" stackId="tokens" fill="#8b5cf6" name="Output tokens" />
+                <Bar yAxisId="tokens" dataKey="cache_read_tokens" stackId="tokens" fill="#22c55e" name="Cache read" />
+                <Bar yAxisId="tokens" dataKey="cache_creation_tokens" stackId="tokens" fill="#6366f1" name="Cache creation" />
+                <Line yAxisId="cost" dataKey="cost_usd" stroke="#f59e0b" strokeWidth={2.5} dot={false} name="Cost" />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="min-w-0 rounded-xl border border-white/10 bg-white/5 p-2.5">
+            <h3 className="mb-2 text-sm font-semibold text-slate-100">Activity</h3>
+            <ResponsiveContainer width="100%" height={220}>
+              <AreaChart data={data as any} margin={{ top: 6, right: 16, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
+                <XAxis dataKey="hour" tickFormatter={formatHourLabel} tick={{ fontSize: 11, fill: "#94a3b8" }} />
+                <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={(v) => fmtCompact(Number(v))} />
+                <Tooltip
+                  contentStyle={{ background: "rgba(2,6,23,0.95)", border: "1px solid rgba(148,163,184,0.18)", borderRadius: "12px", color: "#e2e8f0" }}
+                  formatter={(value, name) => [fmtCompact(Number(value ?? 0)), String(name).replaceAll("_", " ")]}
+                />
+                <Legend wrapperStyle={{ color: "#cbd5e1" }} />
+                <Area type="monotone" dataKey="lines_of_code" stroke="#60a5fa" fill="rgba(96,165,250,0.18)" name="Lines changed" />
+                <Line type="monotone" dataKey="api_requests" stroke="#34d399" strokeWidth={2} dot={false} name="API requests" />
+                <Line type="monotone" dataKey="tool_calls" stroke="#a855f7" strokeWidth={2} dot={false} name="Tool calls" />
+                <Line type="monotone" dataKey="api_errors" stroke="#ef4444" strokeWidth={2} dot={false} name="API errors" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
         <div className="min-w-0 rounded-xl border border-white/10 bg-white/5 p-2.5">
-          <div className="mb-2 flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-semibold text-slate-100">Activity</h3>
-            </div>
-          </div>
-          <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={data as any} margin={{ top: 6, right: 16, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
-              <XAxis dataKey="hour" tickFormatter={formatHourLabel} tick={{ fontSize: 11, fill: "#94a3b8" }} />
-              <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={(v) => fmtCompact(Number(v))} />
-              <Tooltip
-                contentStyle={{
-                  background: "rgba(2, 6, 23, 0.95)",
-                  border: "1px solid rgba(148,163,184,0.18)",
-                  borderRadius: "12px",
-                  color: "#e2e8f0",
-                }}
-                formatter={(value, name) => [fmtCompact(Number(value ?? 0)), String(name).replaceAll("_", " ")]}
-              />
-              <Legend wrapperStyle={{ color: "#cbd5e1" }} />
-              <Area type="monotone" dataKey="lines_of_code" stroke="#60a5fa" fill="rgba(96, 165, 250, 0.18)" name="Lines changed" />
-              <Line type="monotone" dataKey="api_requests" stroke="#34d399" strokeWidth={2} dot={false} name="API requests" />
-              <Line type="monotone" dataKey="tool_calls" stroke="#a855f7" strokeWidth={2} dot={false} name="Tool calls" />
-              <Line type="monotone" dataKey="api_errors" stroke="#ef4444" strokeWidth={2} dot={false} name="API errors" />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-        </div>
-
-        <div className="min-w-0 rounded-xl border border-white/10 bg-white/5 p-2.5">
-          <div className="mb-2 flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-semibold text-slate-100">Efficiency</h3>
-            </div>
-          </div>
+          <h3 className="mb-2 text-sm font-semibold text-slate-100">Efficiency</h3>
           <ResponsiveContainer width="100%" height={180}>
             <ComposedChart data={data as any} margin={{ top: 6, right: 16, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
@@ -209,12 +187,7 @@ export default function DailyChart() {
               <YAxis yAxisId="efficiency" tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={(v) => fmtCurrency(Number(v), 2)} />
               <YAxis yAxisId="productivity" orientation="right" tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={(v) => `${fmtCompact(Number(v))}/hr`} />
               <Tooltip
-                contentStyle={{
-                  background: "rgba(2, 6, 23, 0.95)",
-                  border: "1px solid rgba(148,163,184,0.18)",
-                  borderRadius: "12px",
-                  color: "#e2e8f0",
-                }}
+                contentStyle={{ background: "rgba(2,6,23,0.95)", border: "1px solid rgba(148,163,184,0.18)", borderRadius: "12px", color: "#e2e8f0" }}
                 formatter={(value, name) => {
                   const v = Number(value ?? 0);
                   if (name === "cost_per_line") return [fmtCurrency(v, 4), "Cost/Line"];
