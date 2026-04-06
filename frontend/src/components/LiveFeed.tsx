@@ -81,11 +81,14 @@ function detailLine(ev: LiveEvent): string | null {
       return parts.length ? parts.join("  ·  ") : null;
     }
     case "metric": {
+      // Only show useful labels — skip noisy resource attrs (user.id, org.id, email, etc.)
+      const SKIP = new Set(["session.id", "user.id", "organization.id", "user.email", "user.name"]);
       const labels = ev.labels ?? {};
-      const parts = Object.entries(labels)
-        .filter(([k]) => k !== "session.id")
-        .map(([k, v]) => `${k}=${v}`);
-      if (labels["session.id"]) parts.unshift(`session ${shortId(labels["session.id"])}`);
+      const parts: string[] = [];
+      if (labels["session.id"]) parts.push(`session ${shortId(labels["session.id"])}`);
+      for (const [k, v] of Object.entries(labels)) {
+        if (!SKIP.has(k)) parts.push(`${k}=${v}`);
+      }
       return parts.length ? parts.join("  ·  ") : null;
     }
     default:
@@ -144,7 +147,7 @@ export default function LiveFeed() {
   }
 
   return (
-    <aside className="flex flex-col rounded-2xl border border-white/10 bg-slate-950/85 shadow-[0_20px_50px_rgba(2,6,23,0.28)] backdrop-blur-md" style={{ height: "100%", minHeight: 420, maxHeight: 720 }}>
+    <aside className="w-full overflow-hidden flex flex-col rounded-2xl border border-white/10 bg-slate-950/85 shadow-[0_20px_50px_rgba(2,6,23,0.28)] backdrop-blur-md" style={{ height: "100%", minHeight: 420, maxHeight: 720 }}>
       <div className="flex items-center justify-between border-b border-white/10 px-3 py-2.5 flex-shrink-0">
         <div>
           <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Live</p>
