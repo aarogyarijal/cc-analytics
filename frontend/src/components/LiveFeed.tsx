@@ -103,16 +103,23 @@ function EventRow({ ev }: { ev: LiveEvent }) {
   const isError = ev.type === "api_error" || (ev.type === "tool_result" && ev.attrs?.success === "false");
 
   return (
-    <div className={`min-w-0 overflow-hidden rounded-lg border ${meta.border} ${meta.bg} px-2.5 py-2 text-[11px] ${isError ? "ring-1 ring-rose-500/30" : ""}`}>
-      <div className="flex min-w-0 items-center gap-2">
-        <span className={`flex h-1.5 w-1.5 flex-shrink-0 rounded-full ${meta.dot}`} />
-        <span className="flex-shrink-0 tabular-nums text-slate-500">{timeStr(ev.receivedAt)}</span>
-        <span className={`flex-shrink-0 w-14 font-semibold uppercase tracking-wide text-[9px] ${meta.accent}`}>{meta.label}</span>
-        <span className="min-w-0 flex-1 truncate font-mono text-slate-200">{primary}</span>
+    <div className={`min-w-0 overflow-hidden rounded-lg border ${meta.border} ${meta.bg} px-2.5 py-1.5 text-[11px] ${isError ? "ring-1 ring-rose-500/30" : ""}`}>
+      {/* Fixed metadata | flex content — two-column layout keeps both lines width-capped */}
+      <div className="flex min-w-0 items-start gap-2">
+        {/* Left: fixed-width metadata column */}
+        <div className="flex flex-shrink-0 items-center gap-1.5 pt-px">
+          <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} />
+          <span className="tabular-nums text-slate-500">{timeStr(ev.receivedAt)}</span>
+          <span className={`w-[52px] text-right font-semibold uppercase tracking-wide text-[9px] ${meta.accent}`}>{meta.label}</span>
+        </div>
+        {/* Right: content column, min-w-0 ensures truncation works */}
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-mono text-slate-200">{primary}</p>
+          {detail && (
+            <p className="truncate font-mono text-[10px] text-slate-500">{detail}</p>
+          )}
+        </div>
       </div>
-      {detail && (
-        <p className="mt-0.5 pl-[calc(6px+8px+28px+56px)] min-w-0 overflow-hidden font-mono text-[10px] text-slate-500 truncate">{detail}</p>
-      )}
     </div>
   );
 }
