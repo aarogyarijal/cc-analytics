@@ -19,6 +19,29 @@ function shortModel(model: string) {
   return model.replace(/^claude-/, "").replace(/-\d{8}$/, "");
 }
 
+/** Parse tool_input JSON and extract the most useful single value */
+function toolInputSummary(toolInputRaw: unknown): string | null {
+  if (!toolInputRaw) return null;
+  try {
+    const obj = JSON.parse(String(toolInputRaw));
+    // Pick the most human-useful field in priority order
+    const val =
+      obj.command ??        // Bash
+      obj.file_path ??      // Read / Edit / Write
+      obj.pattern ??        // Glob / Grep
+      obj.path ??           // Glob
+      obj.url ??            // WebFetch
+      obj.query ??          // WebSearch / Grep
+      null;
+    if (val == null) return null;
+    // Strip home dir noise, keep last 2 path segments
+    const s = String(val).replace(/^\/Users\/[^/]+\//, "~/");
+    return s.length > 60 ? "…" + s.slice(-57) : s;
+  } catch {
+    return null;
+  }
+}
+
 function primaryLine(ev: LiveEvent): string {
   const a = ev.attrs ?? {};
   switch (ev.type) {
@@ -30,22 +53,32 @@ function primaryLine(ev: LiveEvent): string {
     case "tool_result": {
       const tool = String(a.tool_name ?? "unknown");
       const ok = a.success === "true";
-      const dur = a.duration_ms != null ? fmtDurationMs(Number(a.duration_ms)) : "";
-      return `${ok ? "✓" : "✗"} ${tool}  ·  ${dur}`;
+      const dur = a.duration_ms != null ? ` · ${fmtDurationMs(Number(a.duration_ms))}` : "";
+      return `${ok ? "✓" : "✗"} ${tool}${dur}`;
     }
     case "user_prompt":
-      return `length ${a.prompt_length ?? "?"}`;
-    case "tool_decision":
-      return `${a.decision ?? "?"}  ·  ${a.tool_name ?? ""}`;
+      return `new prompt · ${a.prompt_length ?? "?"} chars`;
+    case "tool_decision": {
+      const src = a.source === "config" ? "auto" : "manual";
+      return `${a.decision ?? "?"}  ·  ${a.tool_name ?? ""}  ·  ${src}`;
+    }
     case "api_error": {
       const model = shortModel(String(a.model ?? "?"));
       const code = a.status_code ?? "?";
-      return `${model}  ·  HTTP ${code}`;
+      const dur = a.duration_ms != null ? `  · ${fmtDurationMs(Number(a.duration_ms))}` : "";
+      return `${model}  ·  HTTP ${code}${dur}`;
     }
-    case "metric":
-      return `${String(ev.name ?? "").replace("claude_code.", "")}  +${fmtCompact(Number(ev.value ?? 0))}`;
+    case "metric": {
+      const name = String(ev.name ?? "").replace("claude_code.", "");
+      const labels = ev.labels ?? {};
+      // Show type + model inline on primary line for token/cost metrics
+      const type = labels.type ?? "";
+      const model = labels.model ? shortModel(labels.model) : "";
+      const suffix = [type, model].filter(Boolean).join(" ");
+      return `${name}  +${fmtCompact(Number(ev.value ?? 0))}${suffix ? `  ·  ${suffix}` : ""}`;
+    }
     default:
-      return JSON.stringify(a).slice(0, 80);
+      return String(ev.type);
   }
 }
 
@@ -54,42 +87,35 @@ function detailLine(ev: LiveEvent): string | null {
   switch (ev.type) {
     case "api_request": {
       const parts: string[] = [];
-      if (a["session.id"]) parts.push(`session ${shortId(String(a["session.id"]))}`);
+      if (a["session.id"]) parts.push(`s:${shortId(String(a["session.id"]))}`);
       if (a.input_tokens != null)
-        parts.push(`${fmtCompact(Number(a.input_tokens))} in / ${fmtCompact(Number(a.output_tokens ?? 0))} out`);
+        parts.push(`${fmtCompact(Number(a.input_tokens))}in/${fmtCompact(Number(a.output_tokens ?? 0))}out`);
       if (a.cost_usd != null) parts.push(fmtCurrency(Number(a.cost_usd), 5));
-      if (a["prompt.id"]) parts.push(`prompt ${shortId(String(a["prompt.id"]))}`);
       return parts.length ? parts.join("  ·  ") : null;
     }
     case "tool_result": {
-      const parts: string[] = [];
-      if (a["session.id"]) parts.push(`session ${shortId(String(a["session.id"]))}`);
-      if (a.success !== "true" && a.error) parts.push(String(a.error).slice(0, 60));
-      return parts.length ? parts.join("  ·  ") : null;
+      const input = toolInputSummary(a.tool_input);
+      if (input) return input;
+      if (a["session.id"]) return `s:${shortId(String(a["session.id"]))}`;
+      return null;
     }
     case "user_prompt": {
       const parts: string[] = [];
-      if (a["session.id"]) parts.push(`session ${shortId(String(a["session.id"]))}`);
-      if (a["prompt.id"]) parts.push(`prompt ${shortId(String(a["prompt.id"]))}`);
+      if (a["session.id"]) parts.push(`s:${shortId(String(a["session.id"]))}`);
+      if (a["prompt.id"]) parts.push(`p:${shortId(String(a["prompt.id"]))}`);
       return parts.length ? parts.join("  ·  ") : null;
     }
     case "api_error": {
       const parts: string[] = [];
       if (a.attempt != null && Number(a.attempt) > 1) parts.push(`attempt ${a.attempt}`);
-      if (a.duration_ms != null) parts.push(fmtDurationMs(Number(a.duration_ms)));
-      if (a.error) parts.push(String(a.error).slice(0, 60));
+      if (a.error) parts.push(String(a.error).slice(0, 55));
       return parts.length ? parts.join("  ·  ") : null;
     }
     case "metric": {
-      // Only show useful labels — skip noisy resource attrs (user.id, org.id, email, etc.)
-      const SKIP = new Set(["session.id", "user.id", "organization.id", "user.email", "user.name"]);
+      // Only show session — model+type already on primary line
       const labels = ev.labels ?? {};
-      const parts: string[] = [];
-      if (labels["session.id"]) parts.push(`session ${shortId(labels["session.id"])}`);
-      for (const [k, v] of Object.entries(labels)) {
-        if (!SKIP.has(k)) parts.push(`${k}=${v}`);
-      }
-      return parts.length ? parts.join("  ·  ") : null;
+      if (labels["session.id"]) return `s:${shortId(labels["session.id"])}`;
+      return null;
     }
     default:
       return null;
