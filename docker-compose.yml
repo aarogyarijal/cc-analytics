@@ -9,6 +9,7 @@ services:
     environment:
       CC_ANALYTICS_DB_PATH: /data/analytics.db
       PORT: "6767"
+      TZ: America/New_York
     volumes:
       - cc-analytics-data:/data
     restart: unless-stopped

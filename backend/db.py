@@ -87,7 +87,7 @@ def insert_event(event_name: str, attrs: dict, ts_ms: int | None = None):
 
 def _today_midnight_ms() -> int:
     import datetime
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now()  # local time, respects TZ env var
     midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
     return int(midnight.timestamp() * 1000)
 
@@ -273,7 +273,7 @@ def query_daily(days: int = 30) -> list[dict]:
     with conn_ctx() as conn:
         token_rows = conn.execute(
             """
-            SELECT date(ts/1000,'unixepoch') AS date,
+            SELECT date(ts/1000,'unixepoch','localtime') AS date,
                    json_extract(labels,'$.type') AS type,
                    SUM(value) AS total
             FROM metrics
@@ -286,7 +286,7 @@ def query_daily(days: int = 30) -> list[dict]:
 
         cost_rows = conn.execute(
             """
-            SELECT date(ts/1000,'unixepoch') AS date, SUM(value) AS total
+            SELECT date(ts/1000,'unixepoch','localtime') AS date, SUM(value) AS total
             FROM metrics
             WHERE name='claude_code.cost.usage' AND ts >= ?
             GROUP BY date ORDER BY date
@@ -296,7 +296,7 @@ def query_daily(days: int = 30) -> list[dict]:
 
         session_rows = conn.execute(
             """
-            SELECT date(ts/1000,'unixepoch') AS date,
+            SELECT date(ts/1000,'unixepoch','localtime') AS date,
                    COUNT(DISTINCT session_id) AS cnt
             FROM events
             WHERE ts >= ? AND session_id IS NOT NULL
@@ -307,7 +307,7 @@ def query_daily(days: int = 30) -> list[dict]:
 
         line_rows = conn.execute(
             """
-            SELECT date(ts/1000,'unixepoch') AS date,
+            SELECT date(ts/1000,'unixepoch','localtime') AS date,
                    json_extract(labels,'$.type') AS type,
                    SUM(value) AS total
             FROM metrics
@@ -320,7 +320,7 @@ def query_daily(days: int = 30) -> list[dict]:
 
         active_rows = conn.execute(
             """
-            SELECT date(ts/1000,'unixepoch') AS date,
+            SELECT date(ts/1000,'unixepoch','localtime') AS date,
                    json_extract(labels,'$.type') AS type,
                    SUM(value) AS total
             FROM metrics
@@ -333,7 +333,7 @@ def query_daily(days: int = 30) -> list[dict]:
 
         commit_rows = conn.execute(
             """
-            SELECT date(ts/1000,'unixepoch') AS date, SUM(value) AS total
+            SELECT date(ts/1000,'unixepoch','localtime') AS date, SUM(value) AS total
             FROM metrics
             WHERE name='claude_code.commit.count' AND ts >= ?
             GROUP BY date ORDER BY date
@@ -343,7 +343,7 @@ def query_daily(days: int = 30) -> list[dict]:
 
         pr_rows = conn.execute(
             """
-            SELECT date(ts/1000,'unixepoch') AS date, SUM(value) AS total
+            SELECT date(ts/1000,'unixepoch','localtime') AS date, SUM(value) AS total
             FROM metrics
             WHERE name='claude_code.pull_request.count' AND ts >= ?
             GROUP BY date ORDER BY date
@@ -353,7 +353,7 @@ def query_daily(days: int = 30) -> list[dict]:
 
         api_request_rows = conn.execute(
             """
-            SELECT date(ts/1000,'unixepoch') AS date,
+            SELECT date(ts/1000,'unixepoch','localtime') AS date,
                    COUNT(*) AS cnt,
                    AVG(CAST(json_extract(attrs,'$.duration_ms') AS REAL)) AS avg_duration
             FROM events
@@ -365,7 +365,7 @@ def query_daily(days: int = 30) -> list[dict]:
 
         api_error_rows = conn.execute(
             """
-            SELECT date(ts/1000,'unixepoch') AS date, COUNT(*) AS cnt
+            SELECT date(ts/1000,'unixepoch','localtime') AS date, COUNT(*) AS cnt
             FROM events
             WHERE event_name='api_error' AND ts >= ?
             GROUP BY date ORDER BY date
@@ -375,7 +375,7 @@ def query_daily(days: int = 30) -> list[dict]:
 
         tool_result_rows = conn.execute(
             """
-            SELECT date(ts/1000,'unixepoch') AS date, COUNT(*) AS cnt
+            SELECT date(ts/1000,'unixepoch','localtime') AS date, COUNT(*) AS cnt
             FROM events
             WHERE event_name='tool_result' AND ts >= ?
             GROUP BY date ORDER BY date
@@ -757,7 +757,7 @@ def query_hourly(hours: int = 24) -> list[dict]:
         # Get hourly tokens
         token_rows = conn.execute(
             """
-            SELECT strftime('%Y-%m-%d %H:00', datetime(ts/1000, 'unixepoch')) AS hour,
+            SELECT strftime('%Y-%m-%d %H:00', datetime(ts/1000, 'unixepoch', 'localtime')) AS hour,
                    json_extract(labels,'$.type') AS type,
                    SUM(value) AS total
             FROM metrics
@@ -771,7 +771,7 @@ def query_hourly(hours: int = 24) -> list[dict]:
         # Get hourly cost
         cost_rows = conn.execute(
             """
-            SELECT strftime('%Y-%m-%d %H:00', datetime(ts/1000, 'unixepoch')) AS hour,
+            SELECT strftime('%Y-%m-%d %H:00', datetime(ts/1000, 'unixepoch', 'localtime')) AS hour,
                    SUM(value) AS total
             FROM metrics
             WHERE name='claude_code.cost.usage' AND ts >= ?
@@ -783,7 +783,7 @@ def query_hourly(hours: int = 24) -> list[dict]:
         # Get hourly api_requests
         api_rows = conn.execute(
             """
-            SELECT strftime('%Y-%m-%d %H:00', datetime(ts/1000, 'unixepoch')) AS hour,
+            SELECT strftime('%Y-%m-%d %H:00', datetime(ts/1000, 'unixepoch', 'localtime')) AS hour,
                    COUNT(*) AS cnt
             FROM events
             WHERE event_name='api_request' AND ts >= ?
@@ -795,7 +795,7 @@ def query_hourly(hours: int = 24) -> list[dict]:
         # Get hourly api_errors
         error_rows = conn.execute(
             """
-            SELECT strftime('%Y-%m-%d %H:00', datetime(ts/1000, 'unixepoch')) AS hour,
+            SELECT strftime('%Y-%m-%d %H:00', datetime(ts/1000, 'unixepoch', 'localtime')) AS hour,
                    COUNT(*) AS cnt
             FROM events
             WHERE event_name='api_error' AND ts >= ?
@@ -807,7 +807,7 @@ def query_hourly(hours: int = 24) -> list[dict]:
         # Get hourly lines_of_code
         line_rows = conn.execute(
             """
-            SELECT strftime('%Y-%m-%d %H:00', datetime(ts/1000, 'unixepoch')) AS hour,
+            SELECT strftime('%Y-%m-%d %H:00', datetime(ts/1000, 'unixepoch', 'localtime')) AS hour,
                    json_extract(labels,'$.type') AS type,
                    SUM(value) AS total
             FROM metrics
@@ -821,7 +821,7 @@ def query_hourly(hours: int = 24) -> list[dict]:
         # Get hourly tool_calls
         tool_rows = conn.execute(
             """
-            SELECT strftime('%Y-%m-%d %H:00', datetime(ts/1000, 'unixepoch')) AS hour,
+            SELECT strftime('%Y-%m-%d %H:00', datetime(ts/1000, 'unixepoch', 'localtime')) AS hour,
                    COUNT(*) AS cnt
             FROM events
             WHERE event_name='tool_result' AND ts >= ?
@@ -872,21 +872,223 @@ def query_hourly(hours: int = 24) -> list[dict]:
     return sorted(by_hour.values(), key=lambda x: x["hour"])
 
 
+def query_30min(hours: int = 24) -> list[dict]:
+    """Return 30-minute interval aggregations for the last N hours."""
+    since = int(time.time() * 1000) - hours * 3_600_000
+    with conn_ctx() as conn:
+        token_rows = conn.execute(
+            """
+            SELECT strftime('%Y-%m-%d %H:', datetime(ts/1000,'unixepoch','localtime')) ||
+                   CASE WHEN cast(strftime('%M', datetime(ts/1000,'unixepoch','localtime')) as int) < 30 THEN '00' ELSE '30' END AS interval,
+                   json_extract(labels,'$.type') AS type,
+                   SUM(value) AS total
+            FROM metrics
+            WHERE name='claude_code.token.usage' AND ts >= ?
+            GROUP BY interval, type ORDER BY interval
+            """,
+            (since,),
+        ).fetchall()
+        cost_rows = conn.execute(
+            """
+            SELECT strftime('%Y-%m-%d %H:', datetime(ts/1000,'unixepoch','localtime')) ||
+                   CASE WHEN cast(strftime('%M', datetime(ts/1000,'unixepoch','localtime')) as int) < 30 THEN '00' ELSE '30' END AS interval,
+                   SUM(value) AS total
+            FROM metrics
+            WHERE name='claude_code.cost.usage' AND ts >= ?
+            GROUP BY interval ORDER BY interval
+            """,
+            (since,),
+        ).fetchall()
+        api_rows = conn.execute(
+            """
+            SELECT strftime('%Y-%m-%d %H:', datetime(ts/1000,'unixepoch','localtime')) ||
+                   CASE WHEN cast(strftime('%M', datetime(ts/1000,'unixepoch','localtime')) as int) < 30 THEN '00' ELSE '30' END AS interval,
+                   COUNT(*) AS cnt
+            FROM events
+            WHERE event_name='api_request' AND ts >= ?
+            GROUP BY interval ORDER BY interval
+            """,
+            (since,),
+        ).fetchall()
+        error_rows = conn.execute(
+            """
+            SELECT strftime('%Y-%m-%d %H:', datetime(ts/1000,'unixepoch','localtime')) ||
+                   CASE WHEN cast(strftime('%M', datetime(ts/1000,'unixepoch','localtime')) as int) < 30 THEN '00' ELSE '30' END AS interval,
+                   COUNT(*) AS cnt
+            FROM events
+            WHERE event_name='api_error' AND ts >= ?
+            GROUP BY interval ORDER BY interval
+            """,
+            (since,),
+        ).fetchall()
+        line_rows = conn.execute(
+            """
+            SELECT strftime('%Y-%m-%d %H:', datetime(ts/1000,'unixepoch','localtime')) ||
+                   CASE WHEN cast(strftime('%M', datetime(ts/1000,'unixepoch','localtime')) as int) < 30 THEN '00' ELSE '30' END AS interval,
+                   json_extract(labels,'$.type') AS type,
+                   SUM(value) AS total
+            FROM metrics
+            WHERE name='claude_code.lines_of_code.count' AND ts >= ?
+            GROUP BY interval, type ORDER BY interval
+            """,
+            (since,),
+        ).fetchall()
+        tool_rows = conn.execute(
+            """
+            SELECT strftime('%Y-%m-%d %H:', datetime(ts/1000,'unixepoch','localtime')) ||
+                   CASE WHEN cast(strftime('%M', datetime(ts/1000,'unixepoch','localtime')) as int) < 30 THEN '00' ELSE '30' END AS interval,
+                   COUNT(*) AS cnt
+            FROM events
+            WHERE event_name='tool_result' AND ts >= ?
+            GROUP BY interval ORDER BY interval
+            """,
+            (since,),
+        ).fetchall()
+
+    by_interval: dict[str, dict] = {}
+    for r in token_rows:
+        h = by_interval.setdefault(r["interval"], {
+            "hour": r["interval"], "input_tokens": 0, "output_tokens": 0,
+            "cache_read_tokens": 0, "cache_creation_tokens": 0, "cost_usd": 0,
+            "api_requests": 0, "api_errors": 0, "lines_of_code": 0, "tool_calls": 0,
+        })
+        key = {"input": "input_tokens", "output": "output_tokens",
+               "cacheRead": "cache_read_tokens", "cacheCreation": "cache_creation_tokens"}.get(r["type"])
+        if key:
+            h[key] += r["total"] or 0
+    for r in cost_rows:
+        by_interval.setdefault(r["interval"], {"hour": r["interval"]})["cost_usd"] = round(r["total"] or 0, 6)
+    for r in api_rows:
+        by_interval.setdefault(r["interval"], {"hour": r["interval"]})["api_requests"] = r["cnt"] or 0
+    for r in error_rows:
+        by_interval.setdefault(r["interval"], {"hour": r["interval"]})["api_errors"] = r["cnt"] or 0
+    for r in line_rows:
+        h = by_interval.setdefault(r["interval"], {"hour": r["interval"]})
+        h["lines_of_code"] = (h.get("lines_of_code", 0) or 0) + (r["total"] or 0)
+    for r in tool_rows:
+        by_interval.setdefault(r["interval"], {"hour": r["interval"]})["tool_calls"] = r["cnt"] or 0
+    return sorted(by_interval.values(), key=lambda x: x["hour"])
+
+
+def query_12hourly(days: int = 7) -> list[dict]:
+    """Return 12-hour interval aggregations for the last N days."""
+    since = int(time.time() * 1000) - days * 86_400_000
+    with conn_ctx() as conn:
+        token_rows = conn.execute(
+            """
+            SELECT strftime('%Y-%m-%d', datetime(ts/1000,'unixepoch','localtime')) AS date,
+                   CASE WHEN cast(strftime('%H', datetime(ts/1000,'unixepoch','localtime')) as int) >= 12 THEN '12:00' ELSE '00:00' END AS half,
+                   json_extract(labels,'$.type') AS type,
+                   SUM(value) AS total
+            FROM metrics
+            WHERE name='claude_code.token.usage' AND ts >= ?
+            GROUP BY date, half, type ORDER BY date, half
+            """,
+            (since,),
+        ).fetchall()
+        cost_rows = conn.execute(
+            """
+            SELECT strftime('%Y-%m-%d', datetime(ts/1000,'unixepoch','localtime')) AS date,
+                   CASE WHEN cast(strftime('%H', datetime(ts/1000,'unixepoch','localtime')) as int) >= 12 THEN '12:00' ELSE '00:00' END AS half,
+                   SUM(value) AS total
+            FROM metrics
+            WHERE name='claude_code.cost.usage' AND ts >= ?
+            GROUP BY date, half ORDER BY date, half
+            """,
+            (since,),
+        ).fetchall()
+        api_rows = conn.execute(
+            """
+            SELECT strftime('%Y-%m-%d', datetime(ts/1000,'unixepoch','localtime')) AS date,
+                   CASE WHEN cast(strftime('%H', datetime(ts/1000,'unixepoch','localtime')) as int) >= 12 THEN '12:00' ELSE '00:00' END AS half,
+                   COUNT(*) AS cnt
+            FROM events
+            WHERE event_name='api_request' AND ts >= ?
+            GROUP BY date, half ORDER BY date, half
+            """,
+            (since,),
+        ).fetchall()
+        error_rows = conn.execute(
+            """
+            SELECT strftime('%Y-%m-%d', datetime(ts/1000,'unixepoch','localtime')) AS date,
+                   CASE WHEN cast(strftime('%H', datetime(ts/1000,'unixepoch','localtime')) as int) >= 12 THEN '12:00' ELSE '00:00' END AS half,
+                   COUNT(*) AS cnt
+            FROM events
+            WHERE event_name='api_error' AND ts >= ?
+            GROUP BY date, half ORDER BY date, half
+            """,
+            (since,),
+        ).fetchall()
+        line_rows = conn.execute(
+            """
+            SELECT strftime('%Y-%m-%d', datetime(ts/1000,'unixepoch','localtime')) AS date,
+                   CASE WHEN cast(strftime('%H', datetime(ts/1000,'unixepoch','localtime')) as int) >= 12 THEN '12:00' ELSE '00:00' END AS half,
+                   json_extract(labels,'$.type') AS type,
+                   SUM(value) AS total
+            FROM metrics
+            WHERE name='claude_code.lines_of_code.count' AND ts >= ?
+            GROUP BY date, half, type ORDER BY date, half
+            """,
+            (since,),
+        ).fetchall()
+        tool_rows = conn.execute(
+            """
+            SELECT strftime('%Y-%m-%d', datetime(ts/1000,'unixepoch','localtime')) AS date,
+                   CASE WHEN cast(strftime('%H', datetime(ts/1000,'unixepoch','localtime')) as int) >= 12 THEN '12:00' ELSE '00:00' END AS half,
+                   COUNT(*) AS cnt
+            FROM events
+            WHERE event_name='tool_result' AND ts >= ?
+            GROUP BY date, half ORDER BY date, half
+            """,
+            (since,),
+        ).fetchall()
+
+    by_interval: dict[str, dict] = {}
+    for r in token_rows:
+        key_str = f"{r['date']} {r['half']}"
+        h = by_interval.setdefault(key_str, {
+            "hour": key_str, "input_tokens": 0, "output_tokens": 0,
+            "cache_read_tokens": 0, "cache_creation_tokens": 0, "cost_usd": 0,
+            "api_requests": 0, "api_errors": 0, "lines_of_code": 0, "tool_calls": 0,
+        })
+        key = {"input": "input_tokens", "output": "output_tokens",
+               "cacheRead": "cache_read_tokens", "cacheCreation": "cache_creation_tokens"}.get(r["type"])
+        if key:
+            h[key] += r["total"] or 0
+    for r in cost_rows:
+        key_str = f"{r['date']} {r['half']}"
+        by_interval.setdefault(key_str, {"hour": key_str})["cost_usd"] = round(r["total"] or 0, 6)
+    for r in api_rows:
+        key_str = f"{r['date']} {r['half']}"
+        by_interval.setdefault(key_str, {"hour": key_str})["api_requests"] = r["cnt"] or 0
+    for r in error_rows:
+        key_str = f"{r['date']} {r['half']}"
+        by_interval.setdefault(key_str, {"hour": key_str})["api_errors"] = r["cnt"] or 0
+    for r in line_rows:
+        key_str = f"{r['date']} {r['half']}"
+        h = by_interval.setdefault(key_str, {"hour": key_str})
+        h["lines_of_code"] = (h.get("lines_of_code", 0) or 0) + (r["total"] or 0)
+    for r in tool_rows:
+        key_str = f"{r['date']} {r['half']}"
+        by_interval.setdefault(key_str, {"hour": key_str})["tool_calls"] = r["cnt"] or 0
+    return sorted(by_interval.values(), key=lambda x: x["hour"])
+
+
 def query_dow_patterns() -> list[dict]:
     """Return day-of-week aggregations (0=Sun to 6=Sat) with cost and productivity metrics."""
     with conn_ctx() as conn:
         dow_rows = conn.execute(
             """
-            SELECT strftime('%w', date(ts/1000,'unixepoch')) AS dow,
-                   COUNT(DISTINCT date(ts/1000,'unixepoch')) AS day_count,
+            SELECT strftime('%w', date(ts/1000,'unixepoch','localtime')) AS dow,
+                   COUNT(DISTINCT date(ts/1000,'unixepoch','localtime')) AS day_count,
                    ROUND(SUM(CASE WHEN name='claude_code.cost.usage' THEN value ELSE 0 END) /
-                         NULLIF(COUNT(DISTINCT date(ts/1000,'unixepoch')), 0), 6) AS avg_cost_usd,
+                         NULLIF(COUNT(DISTINCT date(ts/1000,'unixepoch','localtime')), 0), 6) AS avg_cost_usd,
                    ROUND(SUM(CASE WHEN name='claude_code.lines_of_code.count' THEN value ELSE 0 END) /
-                         NULLIF(COUNT(DISTINCT date(ts/1000,'unixepoch')), 0), 0) AS avg_lines,
+                         NULLIF(COUNT(DISTINCT date(ts/1000,'unixepoch','localtime')), 0), 0) AS avg_lines,
                    ROUND(SUM(CASE WHEN name='claude_code.commit.count' THEN value ELSE 0 END) /
-                         NULLIF(COUNT(DISTINCT date(ts/1000,'unixepoch')), 0), 2) AS avg_commits,
+                         NULLIF(COUNT(DISTINCT date(ts/1000,'unixepoch','localtime')), 0), 2) AS avg_commits,
                    ROUND(COUNT(CASE WHEN event_name='api_request' THEN 1 END) /
-                         NULLIF(COUNT(DISTINCT date(ts/1000,'unixepoch')), 0), 0) AS avg_api_requests
+                         NULLIF(COUNT(DISTINCT date(ts/1000,'unixepoch','localtime')), 0), 0) AS avg_api_requests
             FROM (
               SELECT ts, name, value, NULL AS event_name FROM metrics
               UNION ALL

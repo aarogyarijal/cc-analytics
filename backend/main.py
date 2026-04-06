@@ -130,6 +130,16 @@ def get_hourly(hours: int = Query(default=24, ge=1, le=72)):
     return db.query_hourly(hours)
 
 
+@app.get("/api/30min")
+def get_30min(hours: int = Query(default=24, ge=1, le=72)):
+    return db.query_30min(hours)
+
+
+@app.get("/api/12hourly")
+def get_12hourly(days: int = Query(default=7, ge=1, le=30)):
+    return db.query_12hourly(days)
+
+
 # ── SSE live feed ──────────────────────────────────────────────────────────────
 
 @app.get("/api/live")

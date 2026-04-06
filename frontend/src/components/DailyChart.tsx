@@ -13,29 +13,7 @@ import {
   Area,
   AreaChart,
 } from "recharts";
-import { fmtCompact, fmtCurrency, fmtDurationSeconds, fmtPercent, shortDate } from "../lib/format";
-
-type DayRow = {
-  date: string;
-  input_tokens: number;
-  output_tokens: number;
-  cache_read_tokens: number;
-  cache_creation_tokens: number;
-  cost_usd: number;
-  sessions?: number;
-  lines_added?: number;
-  lines_removed?: number;
-  lines_of_code: number;
-  active_time_user_s?: number;
-  active_time_cli_s?: number;
-  commits?: number;
-  pull_requests?: number;
-  api_requests: number;
-  api_errors: number;
-  api_avg_duration_ms?: number;
-  tool_calls?: number;
-  rolling_7d_cost_usd?: number;
-};
+import { fmtCompact, fmtCurrency, fmtPercent } from "../lib/format";
 
 type HourlyRow = {
   hour: string;
@@ -59,12 +37,6 @@ function StatChip({ label, value }: { label: string; value: string }) {
   );
 }
 
-type EnhancedDayRow = DayRow & {
-  cost_per_line: number;
-  cost_per_commit: number;
-  lines_per_hour: number;
-};
-
 type EnhancedHourlyRow = HourlyRow & {
   cost_per_line: number;
   lines_per_hour: number;
@@ -75,55 +47,41 @@ function formatHourLabel(hour: string): string {
   return `${date.slice(-2)}/${time}`;
 }
 
-export default function DailyChart({ days = 30 }: { days?: number }) {
+export default function DailyChart() {
   const [view, setView] = useState<"day" | "week">("week");
 
-  const { data: rawDailyData = [] } = useQuery<DayRow[]>({
-    queryKey: ["daily", days],
-    queryFn: () => fetch(`/api/daily?days=${days}`).then((r) => r.json()),
-    refetchInterval: 60_000,
-    enabled: view === "week",
-  });
-
-  const { data: rawHourlyData = [] } = useQuery<HourlyRow[]>({
-    queryKey: ["hourly"],
-    queryFn: () => fetch("/api/hourly?hours=24").then((r) => r.json()),
+  const { data: rawDayData = [] } = useQuery<HourlyRow[]>({
+    queryKey: ["30min"],
+    queryFn: () => fetch("/api/30min?hours=24").then((r) => r.json()),
     refetchInterval: 60_000,
     enabled: view === "day",
   });
 
-  // Enhance data based on view
-  const dailyData: EnhancedDayRow[] = rawDailyData.map((row) => ({
+  const { data: rawWeekData = [] } = useQuery<HourlyRow[]>({
+    queryKey: ["12hourly"],
+    queryFn: () => fetch("/api/12hourly?days=7").then((r) => r.json()),
+    refetchInterval: 60_000,
+    enabled: view === "week",
+  });
+
+  const intervalHours = view === "day" ? 0.5 : 12;
+  const data: EnhancedHourlyRow[] = (view === "day" ? rawDayData : rawWeekData).map((row) => ({
     ...row,
     cost_per_line: row.lines_of_code > 0 ? row.cost_usd / row.lines_of_code : 0,
-    cost_per_commit: (row.commits ?? 0) > 0 ? row.cost_usd / (row.commits ?? 0) : 0,
-    lines_per_hour: ((row.active_time_user_s ?? 0) + (row.active_time_cli_s ?? 0)) > 0
-      ? (row.lines_of_code / (((row.active_time_user_s ?? 0) + (row.active_time_cli_s ?? 0)) / 3600))
-      : 0,
+    lines_per_hour: row.lines_of_code / intervalHours,
   }));
-
-  const hourlyData: EnhancedHourlyRow[] = rawHourlyData.map((row) => ({
-    ...row,
-    cost_per_line: row.lines_of_code > 0 ? row.cost_usd / row.lines_of_code : 0,
-    lines_per_hour: 0, // Not applicable for hourly view
-  }));
-
-  const data = view === "week" ? dailyData : hourlyData;
-  const xAxisFormatter = view === "week" ? shortDate : formatHourLabel;
 
   const totals = data.reduce(
     (acc, row: any) => {
       acc.cost += row.cost_usd;
-      acc.sessions += (row.sessions ?? 0);
       acc.tokens += row.input_tokens + row.output_tokens;
-      acc.active += ((row.active_time_user_s ?? 0) + (row.active_time_cli_s ?? 0));
-      acc.errors += row.api_errors;
-      acc.lines += row.lines_of_code;
-      acc.commits += (row.commits ?? 0);
-      acc.prs += (row.pull_requests ?? 0);
+      acc.errors += row.api_errors ?? 0;
+      acc.api_requests += row.api_requests ?? 0;
+      acc.tool_calls += row.tool_calls ?? 0;
+      acc.lines += row.lines_of_code ?? 0;
       return acc;
     },
-    { cost: 0, sessions: 0, tokens: 0, active: 0, errors: 0, lines: 0, commits: 0, prs: 0 },
+    { cost: 0, tokens: 0, errors: 0, api_requests: 0, tool_calls: 0, lines: 0 },
   );
 
   const latest = data.at(-1) as any;
@@ -165,7 +123,7 @@ export default function DailyChart({ days = 30 }: { days?: number }) {
         <div className="flex flex-wrap gap-2">
           <StatChip label="Cost" value={fmtCurrency(totals.cost, 2)} />
           <StatChip label="Tokens" value={fmtCompact(totals.tokens)} />
-          <StatChip label="Sessions" value={fmtCompact(totals.sessions)} />
+          <StatChip label="Requests" value={fmtCompact(totals.api_requests)} />
           <StatChip label="Cache" value={fmtPercent(cacheShare)} />
         </div>
       </div>
@@ -181,7 +139,7 @@ export default function DailyChart({ days = 30 }: { days?: number }) {
             <ResponsiveContainer width="100%" height={220}>
             <ComposedChart data={data as any} margin={{ top: 6, right: 16, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
-              <XAxis dataKey={view === "week" ? "date" : "hour"} tickFormatter={xAxisFormatter} tick={{ fontSize: 11, fill: "#94a3b8" }} />
+              <XAxis dataKey="hour" tickFormatter={formatHourLabel} tick={{ fontSize: 11, fill: "#94a3b8" }} />
               <YAxis yAxisId="tokens" tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={(v) => fmtCompact(Number(v))} />
               <YAxis yAxisId="cost" orientation="right" tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={(v) => fmtCurrency(Number(v), 2)} />
               <Tooltip
@@ -191,7 +149,7 @@ export default function DailyChart({ days = 30 }: { days?: number }) {
                   borderRadius: "12px",
                   color: "#e2e8f0",
                 }}
-                labelFormatter={(label) => `Date ${label}`}
+                labelFormatter={(label) => formatHourLabel(String(label))}
                 formatter={(value, name) => {
                   const v = Number(value ?? 0);
                   if (name === "cost_usd") return [fmtCurrency(v, 4), "Cost"];
@@ -204,7 +162,6 @@ export default function DailyChart({ days = 30 }: { days?: number }) {
               <Bar yAxisId="tokens" dataKey="cache_read_tokens" stackId="tokens" fill="#22c55e" name="Cache read" />
               <Bar yAxisId="tokens" dataKey="cache_creation_tokens" stackId="tokens" fill="#6366f1" name="Cache creation" />
               <Line yAxisId="cost" dataKey="cost_usd" stroke="#f59e0b" strokeWidth={2.5} dot={false} name="Cost" />
-              <Line yAxisId="cost" dataKey="rolling_7d_cost_usd" stroke="rgba(245,158,11,0.5)" strokeWidth={2} strokeDasharray="4 2" dot={false} name="7d avg cost" />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
@@ -218,7 +175,7 @@ export default function DailyChart({ days = 30 }: { days?: number }) {
           <ResponsiveContainer width="100%" height={220}>
             <AreaChart data={data as any} margin={{ top: 6, right: 16, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
-              <XAxis dataKey="date" tickFormatter={shortDate} tick={{ fontSize: 11, fill: "#94a3b8" }} />
+              <XAxis dataKey="hour" tickFormatter={formatHourLabel} tick={{ fontSize: 11, fill: "#94a3b8" }} />
               <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={(v) => fmtCompact(Number(v))} />
               <Tooltip
                 contentStyle={{
@@ -230,10 +187,9 @@ export default function DailyChart({ days = 30 }: { days?: number }) {
                 formatter={(value, name) => [fmtCompact(Number(value ?? 0)), String(name).replaceAll("_", " ")]}
               />
               <Legend wrapperStyle={{ color: "#cbd5e1" }} />
-              <Area type="monotone" dataKey="sessions" stroke="#34d399" fill="rgba(52, 211, 153, 0.22)" name="Sessions" />
               <Area type="monotone" dataKey="lines_of_code" stroke="#60a5fa" fill="rgba(96, 165, 250, 0.18)" name="Lines changed" />
-              <Line type="monotone" dataKey="commits" stroke="#f97316" strokeWidth={2} dot={false} name="Commits" />
-              <Line type="monotone" dataKey="pull_requests" stroke="#a855f7" strokeWidth={2} dot={false} name="Pull requests" />
+              <Line type="monotone" dataKey="api_requests" stroke="#34d399" strokeWidth={2} dot={false} name="API requests" />
+              <Line type="monotone" dataKey="tool_calls" stroke="#a855f7" strokeWidth={2} dot={false} name="Tool calls" />
               <Line type="monotone" dataKey="api_errors" stroke="#ef4444" strokeWidth={2} dot={false} name="API errors" />
             </AreaChart>
           </ResponsiveContainer>
@@ -249,7 +205,7 @@ export default function DailyChart({ days = 30 }: { days?: number }) {
           <ResponsiveContainer width="100%" height={180}>
             <ComposedChart data={data as any} margin={{ top: 6, right: 16, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
-              <XAxis dataKey="date" tickFormatter={shortDate} tick={{ fontSize: 11, fill: "#94a3b8" }} />
+              <XAxis dataKey="hour" tickFormatter={formatHourLabel} tick={{ fontSize: 11, fill: "#94a3b8" }} />
               <YAxis yAxisId="efficiency" tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={(v) => fmtCurrency(Number(v), 2)} />
               <YAxis yAxisId="productivity" orientation="right" tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={(v) => `${fmtCompact(Number(v))}/hr`} />
               <Tooltip
@@ -262,14 +218,12 @@ export default function DailyChart({ days = 30 }: { days?: number }) {
                 formatter={(value, name) => {
                   const v = Number(value ?? 0);
                   if (name === "cost_per_line") return [fmtCurrency(v, 4), "Cost/Line"];
-                  if (name === "cost_per_commit") return [fmtCurrency(v, 4), "Cost/Commit"];
                   if (name === "lines_per_hour") return [fmtCompact(v), "Lines/Hr"];
                   return [String(v), String(name)];
                 }}
               />
               <Legend wrapperStyle={{ color: "#cbd5e1" }} />
               <Bar yAxisId="efficiency" dataKey="cost_per_line" fill="rgba(245,158,11,0.4)" opacity={0.5} name="Cost/Line" />
-              <Line yAxisId="efficiency" dataKey="cost_per_commit" stroke="#f59e0b" strokeWidth={2} dot={false} name="Cost/Commit" />
               <Line yAxisId="productivity" dataKey="lines_per_hour" stroke="#34d399" strokeWidth={2} dot={false} name="Lines/Hr" />
             </ComposedChart>
           </ResponsiveContainer>
@@ -277,14 +231,10 @@ export default function DailyChart({ days = 30 }: { days?: number }) {
       </div>
 
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-        {view === "week" && (
-          <>
-            <StatChip label="Active" value={fmtDurationSeconds(((latest as any)?.active_time_user_s ?? 0) + ((latest as any)?.active_time_cli_s ?? 0))} />
-            <StatChip label="Latency" value={fmtDurationSeconds((latest as any)?.api_avg_duration_ms ?? 0)} />
-          </>
-        )}
-        <StatChip label="Lines" value={fmtCompact(latest?.lines_of_code ?? 0)} />
-        <StatChip label="Errors" value={fmtPercent(latest && latest.api_requests > 0 ? latest.api_errors / latest.api_requests : 0)} />
+        <StatChip label="API Calls" value={fmtCompact(totals.api_requests)} />
+        <StatChip label="Tool Calls" value={fmtCompact(totals.tool_calls)} />
+        <StatChip label="Lines" value={fmtCompact(totals.lines)} />
+        <StatChip label="Error Rate" value={fmtPercent(totals.api_requests > 0 ? totals.errors / totals.api_requests : 0)} />
       </div>
     </section>
   );

@@ -9,7 +9,7 @@ export type LiveEvent = {
   receivedAt: number;
 };
 
-const MAX_EVENTS = 100;
+const MAX_EVENTS = 500;
 
 export function useLiveFeed() {
   const [events, setEvents] = useState<LiveEvent[]>([]);

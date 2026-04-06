@@ -35,7 +35,7 @@ export default function App() {
           <OverviewCards />
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_320px]">
-            <DailyChart days={30} />
+            <DailyChart />
             <div className="xl:sticky xl:top-4">
               <LiveFeed />
             </div>
