@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fmtCompact, fmtDurationMs, shortId } from "../lib/format";
 
@@ -12,6 +13,9 @@ type ErrorRow = {
   max_attempt: number;
 };
 
+type SortKey = "count" | "avg_duration_ms" | "max_duration_ms" | "max_attempt" | "last_seen_ts";
+type SortDir = "asc" | "desc";
+
 function timeAgo(ts: number) {
   const delta = Date.now() - ts;
   if (delta < 60_000) return `${Math.max(1, Math.round(delta / 1000))}s ago`;
@@ -19,11 +23,36 @@ function timeAgo(ts: number) {
   return `${Math.round(delta / 3_600_000)}h ago`;
 }
 
+function SortHeader({ label, sortKey, current, dir, onSort }: { label: string; sortKey: SortKey; current: SortKey; dir: SortDir; onSort: (k: SortKey) => void }) {
+  return (
+    <th
+      className="px-4 py-3 text-right font-medium text-slate-400 cursor-pointer select-none hover:text-slate-200 transition-colors"
+      onClick={() => onSort(sortKey)}
+    >
+      {label} {current === sortKey ? (dir === "desc" ? "↓" : "↑") : ""}
+    </th>
+  );
+}
+
 export default function ErrorPanel() {
   const { data = [] } = useQuery<ErrorRow[]>({
     queryKey: ["errors"],
     queryFn: () => fetch("/api/errors").then((r) => r.json()),
     refetchInterval: 60_000,
+  });
+
+  const [sortKey, setSortKey] = useState<SortKey>("count");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir(sortDir === "desc" ? "asc" : "desc");
+    else { setSortKey(key); setSortDir("desc"); }
+  };
+
+  const sorted = [...data].sort((a, b) => {
+    const av = a[sortKey] as number;
+    const bv = b[sortKey] as number;
+    return sortDir === "desc" ? bv - av : av - bv;
   });
 
   const total = data.reduce((sum, row) => sum + row.count, 0);
@@ -54,15 +83,15 @@ export default function ErrorPanel() {
             <tr>
               <th className="px-4 py-3 text-left font-medium text-slate-400">Model</th>
               <th className="px-4 py-3 text-right font-medium text-slate-400">Status</th>
-              <th className="px-4 py-3 text-right font-medium text-slate-400">Count</th>
-              <th className="px-4 py-3 text-right font-medium text-slate-400">Avg</th>
-              <th className="px-4 py-3 text-right font-medium text-slate-400">Max</th>
-              <th className="px-4 py-3 text-right font-medium text-slate-400">Attempts</th>
-              <th className="px-4 py-3 text-right font-medium text-slate-400">Seen</th>
+              <SortHeader label="Count" sortKey="count" current={sortKey} dir={sortDir} onSort={handleSort} />
+              <SortHeader label="Avg" sortKey="avg_duration_ms" current={sortKey} dir={sortDir} onSort={handleSort} />
+              <SortHeader label="Max" sortKey="max_duration_ms" current={sortKey} dir={sortDir} onSort={handleSort} />
+              <SortHeader label="Attempts" sortKey="max_attempt" current={sortKey} dir={sortDir} onSort={handleSort} />
+              <SortHeader label="Seen" sortKey="last_seen_ts" current={sortKey} dir={sortDir} onSort={handleSort} />
             </tr>
           </thead>
           <tbody>
-            {data.map((row) => (
+            {sorted.map((row) => (
               <tr key={`${row.model}-${row.status_code}`} className="border-t border-white/10 hover:bg-white/5">
                 <td className="px-3 py-2.5 text-slate-100">{shortId(row.model || "unknown", 12, 6)}</td>
                 <td className="px-3 py-2.5 text-right tabular-nums text-slate-200">{row.status_code}</td>

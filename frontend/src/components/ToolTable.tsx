@@ -104,6 +104,12 @@ export default function ToolTable() {
             }}
           />
         </ResponsiveContainer>
+        <div className="mt-2 flex items-center gap-3 text-[10px] text-slate-500">
+          <span>Size = avg duration x calls.</span>
+          <span className="flex items-center gap-1"><span className="inline-block h-2 w-3 rounded-sm" style={{ background: "rgba(34,197,94,0.3)" }} />&ge;95% success</span>
+          <span className="flex items-center gap-1"><span className="inline-block h-2 w-3 rounded-sm" style={{ background: "rgba(245,158,11,0.3)" }} />&ge;80%</span>
+          <span className="flex items-center gap-1"><span className="inline-block h-2 w-3 rounded-sm" style={{ background: "rgba(239,68,68,0.3)" }} />&lt;80%</span>
+        </div>
       </div>
 
       <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-white/5">
@@ -117,10 +123,10 @@ export default function ToolTable() {
               {th("avg_duration_ms", "Avg")}
               {th("p95_duration_ms", "P95")}
               {th("max_duration_ms", "Max")}
-              <th className={`cursor-pointer select-none px-4 py-3 font-medium text-slate-400 hover:text-slate-200 text-right`}>
+              <th className={`cursor-pointer select-none px-4 py-3 font-medium text-slate-400 hover:text-slate-200 text-right`} title="P95/Avg ratio — red >3x, amber >1.5x. High = inconsistent latency">
                 Bottleneck
               </th>
-              <th className={`cursor-pointer select-none px-4 py-3 font-medium text-slate-400 hover:text-slate-200 text-right`}>
+              <th className={`cursor-pointer select-none px-4 py-3 font-medium text-slate-400 hover:text-slate-200 text-right`} title="Total time spent: avg duration x call count">
                 Time Budget
               </th>
             </tr>
@@ -176,6 +182,10 @@ export default function ToolTable() {
             )}
           </tbody>
         </table>
+        <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-white/10 px-3 py-2 text-[10px] text-slate-500">
+          <span>Success: <span className="text-emerald-400">&ge;95%</span> <span className="text-amber-400">&ge;80%</span> <span className="text-rose-400">&lt;80%</span></span>
+          <span>Bottleneck: <span className="text-rose-400">&gt;3x</span> <span className="text-amber-400">&gt;1.5x</span> (P95/Avg ratio)</span>
+        </div>
       </div>
     </section>
   );

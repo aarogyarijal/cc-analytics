@@ -1,137 +1,214 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fmtCurrency, fmtCompact } from "../lib/format";
+import { fmtCurrency } from "../lib/format";
 
-type DowPattern = {
-  dow: number;
-  day_name: string;
-  day_count: number;
-  avg_cost_usd: number;
-  avg_lines: number;
-  avg_commits: number;
-  avg_api_requests: number;
+type DailyRow = {
+  date: string;
+  cost_usd: number;
+  lines_added: number;
+  lines_removed: number;
+  sessions: number;
 };
 
-/**
- * Interpolate a color based on value and max.
- * Returns a Tailwind-style hex color or rgba value.
- */
-function getCostColor(value: number, max: number): string {
-  if (max === 0) return "rgba(15, 23, 42, 0.5)";
-  const ratio = value / max;
-  // Interpolate from dark (low) to amber-500/40 (high)
-  const r = Math.round(251 * ratio);
-  const g = Math.round(146 * ratio);
-  const b = Math.round(11 * (1 - ratio * 0.5));
-  const alpha = 0.2 + ratio * 0.3;
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+type CellData = {
+  date: string;
+  cost: number;
+  lines: number;
+  sessions: number;
+};
+
+type Metric = "cost" | "lines" | "sessions";
+
+const METRICS: Metric[] = ["cost", "lines", "sessions"];
+
+const METRIC_CONFIG: Record<Metric, { label: string; color: [number, number, number] }> = {
+  cost: { label: "Cost", color: [251, 146, 60] },
+  lines: { label: "Lines", color: [52, 211, 153] },
+  sessions: { label: "Sessions", color: [56, 189, 248] },
+};
+
+const DOW_HEADERS = ["S", "M", "T", "W", "T", "F", "S"];
+const TOTAL_WEEKS = 4;
+
+function getCellColor(value: number, max: number, rgb: [number, number, number]): string {
+  if (value === 0 || max === 0) return "rgba(30, 41, 59, 0.5)";
+  const ratio = Math.min(value / max, 1);
+  const level = ratio < 0.25 ? 0.2 : ratio < 0.5 ? 0.35 : ratio < 0.75 ? 0.55 : 0.8;
+  return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${level})`;
 }
 
-function getLinesColor(value: number, max: number): string {
-  if (max === 0) return "rgba(15, 23, 42, 0.5)";
-  const ratio = value / max;
-  // Interpolate from dark (low) to emerald-500/40 (high)
-  const r = Math.round(34 * ratio);
-  const g = Math.round(197 * ratio);
-  const b = Math.round(94 * ratio);
-  const alpha = 0.2 + ratio * 0.3;
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+function getValue(cell: CellData, metric: Metric): number {
+  if (metric === "cost") return cell.cost;
+  if (metric === "lines") return cell.lines;
+  return cell.sessions;
 }
 
-export default function DowHeatmap() {
-  const { data: patterns = [] } = useQuery<DowPattern[]>({
-    queryKey: ["patterns"],
-    queryFn: () => fetch("/api/patterns").then((r) => r.json()),
-    refetchInterval: 60_000,
-  });
+function fmtValue(value: number, metric: Metric): string {
+  if (metric === "cost") return fmtCurrency(value, 2);
+  return String(Math.round(value));
+}
 
-  const maxCost = Math.max(...patterns.map((p) => p.avg_cost_usd), 1);
-  const maxLines = Math.max(...patterns.map((p) => p.avg_lines), 1);
+/** Week label like "Mar 31" from the Monday of that week */
+function weekLabel(cells: CellData[]): string {
+  // Find first valid date in the week (Monday = index 1, or fallback to Sunday = 0)
+  const first = cells.find((c) => c.date);
+  if (!first) return "";
+  const d = new Date(first.date + "T00:00:00");
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
 
-  const [hoveredCell, setHoveredCell] = useState<{ dow: number; metric: string } | null>(null);
+/* ─── Single mini heatmap for one metric (weeks as rows) ─── */
+function MiniGraph({
+  metric,
+  weeks,
+  max,
+}: {
+  metric: Metric;
+  weeks: CellData[][]; // [week][dow], 4 weeks × 7 days
+  max: number;
+}) {
+  const [hovered, setHovered] = useState<CellData | null>(null);
+  const cfg = METRIC_CONFIG[metric];
 
   return (
-    <section className="rounded-2xl border border-white/10 bg-slate-950/85 p-4 shadow-[0_20px_50px_rgba(2,6,23,0.28)] backdrop-blur-md">
-      <div>
-        <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Patterns</p>
-        <h2 className="mt-1 text-lg font-semibold text-slate-50">Day of Week</h2>
+    <div className="flex-1 min-w-0">
+      {/* Title + hover info */}
+      <div className="flex items-center justify-between mb-1.5">
+        <span
+          className="text-[10px] font-semibold uppercase tracking-wider"
+          style={{ color: `rgb(${cfg.color.join(",")})` }}
+        >
+          {cfg.label}
+        </span>
+        <span className="text-[9px] text-slate-500 truncate ml-2">
+          {hovered && hovered.date ? (
+            <>
+              {new Date(hovered.date + "T00:00:00").toLocaleDateString(undefined, {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+              })}
+              {" — "}
+              <span style={{ color: `rgb(${cfg.color.join(",")})` }}>
+                {fmtValue(getValue(hovered, metric), metric)}
+              </span>
+            </>
+          ) : null}
+        </span>
       </div>
 
-      <div className="mt-4 space-y-4">
-        {/* Cost heatmap */}
-        <div>
-          <p className="mb-2 text-xs font-semibold text-amber-300">Average Daily Cost</p>
-          <div className="flex gap-1">
-            {patterns.map((p) => (
-              <div
-                key={`cost-${p.dow}`}
-                className="relative flex-1"
-                onMouseEnter={() => setHoveredCell({ dow: p.dow, metric: "cost" })}
-                onMouseLeave={() => setHoveredCell(null)}
-              >
-                <div
-                  className="h-16 rounded-lg border border-white/10 transition-all"
-                  style={{ backgroundColor: getCostColor(p.avg_cost_usd, maxCost) }}
-                >
-                  {hoveredCell?.dow === p.dow && hoveredCell?.metric === "cost" && (
-                    <div className="absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-2 py-1 text-xs text-slate-100 shadow-lg">
-                      {p.day_name}: {fmtCurrency(p.avg_cost_usd, 4)}
-                    </div>
-                  )}
-                </div>
-                <p className="mt-1 text-center text-[10px] font-medium text-slate-400">{p.day_name.slice(0, 3)}</p>
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* Day-of-week header */}
+      <div className="flex items-center" style={{ marginLeft: 36 }}>
+        {DOW_HEADERS.map((d, i) => (
+          <span
+            key={i}
+            className="text-[8px] text-slate-600 text-center"
+            style={{ width: 13 }}
+          >
+            {d}
+          </span>
+        ))}
+      </div>
 
-        {/* Lines heatmap */}
-        <div>
-          <p className="mb-2 text-xs font-semibold text-emerald-300">Average Daily Lines Changed</p>
-          <div className="flex gap-1">
-            {patterns.map((p) => (
-              <div
-                key={`lines-${p.dow}`}
-                className="relative flex-1"
-                onMouseEnter={() => setHoveredCell({ dow: p.dow, metric: "lines" })}
-                onMouseLeave={() => setHoveredCell(null)}
-              >
-                <div
-                  className="h-16 rounded-lg border border-white/10 transition-all"
-                  style={{ backgroundColor: getLinesColor(p.avg_lines, maxLines) }}
-                >
-                  {hoveredCell?.dow === p.dow && hoveredCell?.metric === "lines" && (
-                    <div className="absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-2 py-1 text-xs text-slate-100 shadow-lg">
-                      {p.day_name}: {fmtCompact(p.avg_lines)} lines
-                    </div>
-                  )}
-                </div>
-                <p className="mt-1 text-center text-[10px] font-medium text-slate-400">{p.day_name.slice(0, 3)}</p>
-              </div>
-            ))}
-          </div>
+      {/* Week rows */}
+      {weeks.map((week, wi) => (
+        <div key={wi} className="flex items-center" style={{ height: 15 }}>
+          <span className="text-[8px] text-slate-600 text-right pr-1 flex-shrink-0" style={{ width: 36 }}>
+            {weekLabel(week)}
+          </span>
+          {week.map((cell, di) => {
+            if (!cell.date) {
+              return <span key={di} className="inline-block" style={{ width: 11, height: 11, margin: 1 }} />;
+            }
+            const val = getValue(cell, metric);
+            return (
+              <span
+                key={di}
+                className="inline-block rounded-sm transition-colors"
+                style={{
+                  width: 11,
+                  height: 11,
+                  margin: 1,
+                  backgroundColor: getCellColor(val, max, cfg.color),
+                }}
+                onMouseEnter={() => setHovered(cell)}
+                onMouseLeave={() => setHovered(null)}
+              />
+            );
+          })}
         </div>
+      ))}
+    </div>
+  );
+}
 
-        {/* Summary stats */}
-        <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-slate-300">
-          <p className="mb-2 font-semibold text-slate-100">Weekly Summary</p>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <p className="text-slate-500">Most expensive day</p>
-              <p className="font-semibold text-amber-300">
-                {patterns.reduce((max, p) => (p.avg_cost_usd > max.avg_cost_usd ? p : max), patterns[0] || {})
-                  ?.day_name || "—"}
-              </p>
-            </div>
-            <div>
-              <p className="text-slate-500">Most productive day</p>
-              <p className="font-semibold text-emerald-300">
-                {patterns.reduce((max, p) => (p.avg_lines > max.avg_lines ? p : max), patterns[0] || {})
-                  ?.day_name || "—"}
-              </p>
-            </div>
-          </div>
+/* ─── Main: 3 compact side-by-side graphs, 4 week-rows each ─── */
+export default function DowHeatmap() {
+  const { data: daily = [] } = useQuery<DailyRow[]>({
+    queryKey: ["daily", 30],
+    queryFn: () => fetch("/api/daily?days=30").then((r) => r.json()),
+    refetchInterval: 120_000,
+  });
+
+  const { weeks, maxByMetric } = useMemo(() => {
+    const byDate = new Map<string, DailyRow>();
+    for (const row of daily) byDate.set(row.date, row);
+
+    const today = new Date();
+    const todayDow = today.getDay(); // 0=Sun
+    // Start from the Sunday 4 weeks ago
+    const startDate = new Date(today);
+    startDate.setDate(today.getDate() - (TOTAL_WEEKS * 7) + (7 - todayDow));
+
+    const result: CellData[][] = [];
+
+    for (let w = 0; w < TOTAL_WEEKS; w++) {
+      const week: CellData[] = [];
+      for (let d = 0; d < 7; d++) {
+        const cellDate = new Date(startDate);
+        cellDate.setDate(startDate.getDate() + w * 7 + d);
+
+        if (cellDate > today) {
+          week.push({ date: "", cost: 0, lines: 0, sessions: 0 });
+          continue;
+        }
+
+        const dateStr = cellDate.toISOString().slice(0, 10);
+        const row = byDate.get(dateStr);
+        week.push({
+          date: dateStr,
+          cost: row?.cost_usd ?? 0,
+          lines: (row?.lines_added ?? 0) + (row?.lines_removed ?? 0),
+          sessions: row?.sessions ?? 0,
+        });
+      }
+      result.push(week);
+    }
+
+    const maxes: Record<Metric, number> = { cost: 0, lines: 0, sessions: 0 };
+    for (const week of result) {
+      for (const cell of week) {
+        if (cell.cost > maxes.cost) maxes.cost = cell.cost;
+        if (cell.lines > maxes.lines) maxes.lines = cell.lines;
+        if (cell.sessions > maxes.sessions) maxes.sessions = cell.sessions;
+      }
+    }
+
+    return { weeks: result, maxByMetric: maxes };
+  }, [daily]);
+
+  return (
+    <section className="rounded-2xl border border-white/10 bg-slate-950/85 px-4 py-3 shadow-[0_20px_50px_rgba(2,6,23,0.28)] backdrop-blur-md">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-baseline gap-2">
+          <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Activity</p>
+          <span className="text-[10px] text-slate-600">Last 4 weeks</span>
         </div>
+      </div>
+      <div className="grid grid-cols-3 gap-4">
+        {METRICS.map((m) => (
+          <MiniGraph key={m} metric={m} weeks={weeks} max={maxByMetric[m]} />
+        ))}
       </div>
     </section>
   );

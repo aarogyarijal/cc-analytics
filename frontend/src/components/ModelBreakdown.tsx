@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   ResponsiveContainer,
@@ -29,11 +30,63 @@ type ModelRow = {
   error_rate: number;
 };
 
+type SortKey = "request_count" | "cost_usd" | "cache_hit_rate" | "output_input_ratio" | "error_rate" | "throughput" | "cache_savings" | "adj_cost";
+type SortDir = "asc" | "desc";
+
+function getThroughput(row: ModelRow) {
+  return row.avg_duration_ms > 0 ? row.output_tokens / (row.avg_duration_ms / 1000) : 0;
+}
+
+function getCacheSavings(row: ModelRow) {
+  return row.cache_savings_usd ?? calculateCacheSavings(row.model, row.cache_read_tokens, row.cost_usd / Math.max(row.input_tokens + row.cache_read_tokens, 1) * 1_000_000);
+}
+
+function getAdjCost(row: ModelRow) {
+  return row.error_rate > 0 && row.error_rate < 1
+    ? row.cost_per_request_usd / (1 - row.error_rate)
+    : row.cost_per_request_usd;
+}
+
+function getSortValue(row: ModelRow, key: SortKey): number {
+  switch (key) {
+    case "throughput": return getThroughput(row);
+    case "cache_savings": return getCacheSavings(row);
+    case "adj_cost": return getAdjCost(row);
+    default: return row[key] as number;
+  }
+}
+
+function SortHeader({ label, sortKey, current, dir, onSort, title }: { label: string; sortKey: SortKey; current: SortKey; dir: SortDir; onSort: (k: SortKey) => void; title?: string }) {
+  return (
+    <th
+      className="px-3 py-2.5 text-right font-medium text-slate-400 cursor-pointer select-none hover:text-slate-200 transition-colors"
+      onClick={() => onSort(sortKey)}
+      title={title}
+    >
+      {label} {current === sortKey ? (dir === "desc" ? "↓" : "↑") : ""}
+    </th>
+  );
+}
+
 export default function ModelBreakdown() {
   const { data = [] } = useQuery<ModelRow[]>({
     queryKey: ["models"],
     queryFn: () => fetch("/api/models").then((r) => r.json()),
     refetchInterval: 60_000,
+  });
+
+  const [sortKey, setSortKey] = useState<SortKey>("cost_usd");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir(sortDir === "desc" ? "asc" : "desc");
+    else { setSortKey(key); setSortDir("desc"); }
+  };
+
+  const sorted = [...data].sort((a, b) => {
+    const av = getSortValue(a, sortKey);
+    const bv = getSortValue(b, sortKey);
+    return sortDir === "desc" ? bv - av : av - bv;
   });
 
   const chartData = [...data]
@@ -105,23 +158,21 @@ export default function ModelBreakdown() {
               <thead className="bg-black/20 text-slate-400">
                 <tr>
                   <th className="px-3 py-2.5 text-left font-medium">Model</th>
-                  <th className="px-3 py-2.5 text-right font-medium">Req</th>
-                  <th className="px-3 py-2.5 text-right font-medium">Cost</th>
-                  <th className="px-3 py-2.5 text-right font-medium">Cache</th>
-                  <th className="px-3 py-2.5 text-right font-medium">Out/In</th>
-                  <th className="px-3 py-2.5 text-right font-medium">Err</th>
-                  <th className="px-3 py-2.5 text-right font-medium">Thrpt</th>
-                  <th className="px-3 py-2.5 text-right font-medium">Saved</th>
-                  <th className="px-3 py-2.5 text-right font-medium">Adj $/req</th>
+                  <SortHeader label="Req" sortKey="request_count" current={sortKey} dir={sortDir} onSort={handleSort} title="Total API requests" />
+                  <SortHeader label="Cost" sortKey="cost_usd" current={sortKey} dir={sortDir} onSort={handleSort} title="Total spend" />
+                  <SortHeader label="Cache" sortKey="cache_hit_rate" current={sortKey} dir={sortDir} onSort={handleSort} title="Cache hit rate: cache_read / (input + cache_read + cache_creation)" />
+                  <SortHeader label="Out/In" sortKey="output_input_ratio" current={sortKey} dir={sortDir} onSort={handleSort} title="Output-to-input token ratio" />
+                  <SortHeader label="Err" sortKey="error_rate" current={sortKey} dir={sortDir} onSort={handleSort} title="Error rate: errors / requests" />
+                  <SortHeader label="Thrpt" sortKey="throughput" current={sortKey} dir={sortDir} onSort={handleSort} title="Throughput: output tokens per second" />
+                  <SortHeader label="Saved" sortKey="cache_savings" current={sortKey} dir={sortDir} onSort={handleSort} title="Cache savings: money saved by cache hits vs full-price input" />
+                  <SortHeader label="Adj $/req" sortKey="adj_cost" current={sortKey} dir={sortDir} onSort={handleSort} title="Adjusted cost per request: cost/req divided by (1 - error_rate)" />
                 </tr>
               </thead>
               <tbody>
-                {data.map((row) => {
-                  const throughput = row.avg_duration_ms > 0 ? (row.output_tokens / (row.avg_duration_ms / 1000)).toFixed(1) : "0";
-                  const cacheSavings = row.cache_savings_usd ?? calculateCacheSavings(row.model, row.cache_read_tokens, row.cost_usd / Math.max(row.input_tokens + row.cache_read_tokens, 1) * 1_000_000);
-                  const adjCostPerReq = row.error_rate > 0 && row.error_rate < 1
-                    ? row.cost_per_request_usd / (1 - row.error_rate)
-                    : row.cost_per_request_usd;
+                {sorted.map((row) => {
+                  const throughput = getThroughput(row).toFixed(1);
+                  const cacheSavings = getCacheSavings(row);
+                  const adjCostPerReq = getAdjCost(row);
 
                   return (
                     <tr key={row.model} className="border-t border-white/10 hover:bg-white/5">
