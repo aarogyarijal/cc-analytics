@@ -1,3 +1,4 @@
+import asyncio
 import os
 import aiosqlite
 import json
@@ -9,6 +10,7 @@ DB_PATH = Path(os.getenv("CC_ANALYTICS_DB_PATH", str(Path(__file__).parent / "an
 
 # Module-level persistent connection (set by init_db, closed by close_db)
 _conn: aiosqlite.Connection | None = None
+_conn_lock = asyncio.Lock()
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS metrics (
@@ -54,25 +56,28 @@ MODEL_PRICING = {
 
 async def _get_conn() -> aiosqlite.Connection:
     global _conn
-    if _conn is None:
-        _conn = await aiosqlite.connect(DB_PATH)
-        _conn.row_factory = aiosqlite.Row
-        await _conn.execute("PRAGMA journal_mode=WAL")
-        await _conn.execute("PRAGMA synchronous=NORMAL")
-        await _conn.execute("PRAGMA cache_size=-64000")       # 64 MB
-        await _conn.execute("PRAGMA mmap_size=268435456")     # 256 MB
-        await _conn.execute("PRAGMA temp_store=MEMORY")
-    return _conn
+    async with _conn_lock:
+        if _conn is None:
+            _conn = await aiosqlite.connect(DB_PATH)
+            _conn.row_factory = aiosqlite.Row
+            await _conn.execute("PRAGMA journal_mode=WAL")
+            await _conn.execute("PRAGMA synchronous=NORMAL")
+            await _conn.execute("PRAGMA cache_size=-64000")       # 64 MB
+            await _conn.execute("PRAGMA mmap_size=268435456")     # 256 MB
+            await _conn.execute("PRAGMA temp_store=MEMORY")
+        return _conn
 
 
 @asynccontextmanager
-async def conn_ctx():
+async def conn_ctx(readonly: bool = False):
     conn = await _get_conn()
     try:
         yield conn
-        await conn.commit()
+        if not readonly:
+            await conn.commit()
     except Exception:
-        await conn.rollback()
+        if not readonly:
+            await conn.rollback()
         raise
 
 
@@ -149,7 +154,7 @@ def _empty_daily_row(date: str) -> dict:
 async def query_overview() -> dict:
     since = _today_midnight_ms()
     alltime_since = _days_ago_midnight_ms(365)
-    async with conn_ctx() as conn:
+    async with conn_ctx(readonly=True) as conn:
         # Single consolidated metrics query (replaces 7 separate queries)
         cursor = await conn.execute(
             """
@@ -175,12 +180,12 @@ async def query_overview() -> dict:
         cursor = await conn.execute(
             """
             SELECT
-              COUNT(DISTINCT session_id) AS sessions_today,
+              COUNT(DISTINCT CASE WHEN session_id IS NOT NULL THEN session_id END) AS sessions_today,
               SUM(CASE WHEN event_name='api_request' THEN 1 END) AS api_requests,
               SUM(CASE WHEN event_name='api_error' THEN 1 END) AS api_errors,
               SUM(CASE WHEN event_name='tool_result' AND json_extract(attrs,'$.success')='true' THEN 1 END) AS tool_success,
               SUM(CASE WHEN event_name='tool_result' THEN 1 END) AS tool_total
-            FROM events WHERE ts >= ? AND session_id IS NOT NULL
+            FROM events WHERE ts >= ?
             """,
             (since,),
         )
@@ -260,7 +265,7 @@ async def query_overview() -> dict:
 
 async def query_daily(days: int = 30) -> list[dict]:
     since = _days_ago_midnight_ms(days)
-    async with conn_ctx() as conn:
+    async with conn_ctx(readonly=True) as conn:
         # Consolidated metrics query (replaces 7 separate queries)
         cursor = await conn.execute(
             """
@@ -288,13 +293,13 @@ async def query_daily(days: int = 30) -> list[dict]:
         cursor = await conn.execute(
             """
             SELECT date(ts/1000,'unixepoch','localtime') AS date,
-                   COUNT(DISTINCT session_id) AS sessions,
+                   COUNT(DISTINCT CASE WHEN session_id IS NOT NULL THEN session_id END) AS sessions,
                    SUM(CASE WHEN event_name='api_request' THEN 1 END) AS api_requests,
                    AVG(CASE WHEN event_name='api_request' THEN CAST(json_extract(attrs,'$.duration_ms') AS REAL) END) AS api_avg_duration,
                    SUM(CASE WHEN event_name='api_error' THEN 1 END) AS api_errors,
                    SUM(CASE WHEN event_name='tool_result' THEN 1 END) AS tool_calls
             FROM events
-            WHERE ts >= ? AND session_id IS NOT NULL
+            WHERE ts >= ?
             GROUP BY date ORDER BY date
             """,
             (since,),
@@ -336,7 +341,7 @@ async def query_daily(days: int = 30) -> list[dict]:
 
 
 async def query_models() -> list[dict]:
-    async with conn_ctx() as conn:
+    async with conn_ctx(readonly=True) as conn:
         cursor = await conn.execute(
             """
             SELECT json_extract(labels,'$.model') AS model,
@@ -439,7 +444,7 @@ async def query_models() -> list[dict]:
 
 
 async def query_tools() -> list[dict]:
-    async with conn_ctx() as conn:
+    async with conn_ctx(readonly=True) as conn:
         cursor = await conn.execute(
             """
             SELECT json_extract(attrs,'$.tool_name') AS tool,
@@ -496,7 +501,7 @@ async def query_tools() -> list[dict]:
 
 
 async def query_decisions() -> list[dict]:
-    async with conn_ctx() as conn:
+    async with conn_ctx(readonly=True) as conn:
         cursor = await conn.execute(
             """
             SELECT json_extract(labels,'$.tool_name') AS tool,
@@ -524,7 +529,7 @@ async def query_decisions() -> list[dict]:
 
 async def query_sessions(limit: int = 50, since_hours: int = 168) -> list[dict]:
     cutoff_ms = int((time.time() - since_hours * 3600) * 1000)
-    async with conn_ctx() as conn:
+    async with conn_ctx(readonly=True) as conn:
         cursor = await conn.execute(
             """
             WITH session_events AS (
@@ -623,7 +628,7 @@ async def query_sessions(limit: int = 50, since_hours: int = 168) -> list[dict]:
 
 
 async def query_errors(limit: int = 25) -> list[dict]:
-    async with conn_ctx() as conn:
+    async with conn_ctx(readonly=True) as conn:
         cursor = await conn.execute(
             """
             SELECT json_extract(attrs,'$.model') AS model,
@@ -681,7 +686,7 @@ async def query_environmental(days: int = 30) -> list[dict]:
     CO2_KG_PER_KWH = 0.386   # US average (EPA 2023)
 
     since = _days_ago_midnight_ms(days)
-    async with conn_ctx() as conn:
+    async with conn_ctx(readonly=True) as conn:
         cursor = await conn.execute(
             """
             SELECT date(ts/1000,'unixepoch','localtime') AS date,
@@ -737,8 +742,11 @@ async def _query_bucketed(bucket_expr: str, since_ms: int, extra_params: tuple =
 
     bucket_expr: SQL expression that produces the bucket label, aliased as 'bucket'.
     extra_params: additional bind params needed by the bucket expression (e.g. interval_secs).
+
+    SAFETY: bucket_expr is interpolated into SQL via f-string. All callers pass
+    hardcoded SQL expressions only. Never pass user input as bucket_expr.
     """
-    async with conn_ctx() as conn:
+    async with conn_ctx(readonly=True) as conn:
         # Consolidated metrics query
         m_params = (*extra_params, since_ms)
         cursor = await conn.execute(
@@ -840,7 +848,7 @@ async def query_12hourly(days: int = 7) -> list[dict]:
 async def query_dow_patterns() -> list[dict]:
     """Return day-of-week aggregations (0=Sun to 6=Sat) with cost and productivity metrics."""
     dow_since = _days_ago_midnight_ms(90)
-    async with conn_ctx() as conn:
+    async with conn_ctx(readonly=True) as conn:
         cursor = await conn.execute(
             """
             SELECT strftime('%w', date(ts/1000,'unixepoch','localtime')) AS dow,
@@ -883,7 +891,7 @@ async def query_dow_patterns() -> list[dict]:
 
 async def query_session_events(session_id: str, limit: int = 200) -> list[dict]:
     """Return chronological events for a single session."""
-    async with conn_ctx() as conn:
+    async with conn_ctx(readonly=True) as conn:
         cursor = await conn.execute(
             """
             SELECT ts, event_name, attrs

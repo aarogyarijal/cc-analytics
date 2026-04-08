@@ -28,6 +28,7 @@ export default function ToolTable() {
         qc.invalidateQueries({ queryKey: ["tools"] });
       }, 5000);
     }
+    return () => clearTimeout(debounceRef.current);
   }, [events, qc]);
 
   const { data = [] } = useQuery<ToolRow[]>({
