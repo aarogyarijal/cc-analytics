@@ -19,8 +19,8 @@ source ~/.zshrc    # activate the env vars in the current shell
 ### Run (development)
 
 ```bash
-make dev           # start backend (port 8000) + frontend (Vite dev, port 5173) concurrently
-make backend       # backend only (port 8000)
+make dev           # start backend (port 6767) + frontend (Vite dev, port 5173) concurrently
+make backend       # backend only (port 6767)
 make frontend      # frontend only (Vite dev, port 5173)
 ```
 
@@ -65,7 +65,7 @@ REST endpoints are polled by React Query components. SSE `/api/live` is consumed
 - **`main.py`** — FastAPI app; OTLP receivers, REST endpoints, SSE `/api/live`. Live broadcast is pure in-process (no Redis/pubsub).
 - **`otlp.py`** — stateless helpers to unwrap OTLP attribute encoding (`{"stringValue": "..."}` etc.) into plain Python dicts. Merges resource attrs (`session.id`, `user.id`, etc.) into each metric/event's labels.
 - **`db.py`** — all SQLite access. Two tables: `metrics` (name/value/labels/ts) and `events` (event_name/attrs/session_id/ts). All queries live here. Contains `MODEL_PRICING` dict for cache savings calculations.
-- **`analytics.db`** — SQLite file, committed to the repo (intentional — personal local data). Override path with `CC_ANALYTICS_DB_PATH` env var.
+- **`analytics.db`** — SQLite file, gitignored (personal local data). Override path with `CC_ANALYTICS_DB_PATH` env var.
 
 ### REST API endpoints
 
@@ -74,6 +74,10 @@ REST endpoints are polled by React Query components. SSE `/api/live` is consumed
 | `GET /api/overview` | — | Today's KPIs + all-time totals |
 | `GET /api/daily` | `days` (1–365, default 30) | Daily aggregations with rolling 7d cost |
 | `GET /api/hourly` | `hours` (1–72, default 24) | Hourly aggregations for the last N hours |
+| `GET /api/30min` | `hours` (1–72, default 24) | 30-minute bucket aggregations |
+| `GET /api/12hourly` | `days` (1–30, default 7) | 12-hour bucket aggregations |
+| `GET /api/interval` | `interval_hours`, `total_hours` | Custom-interval aggregations |
+| `GET /api/environmental` | `days` (1–365, default 30) | Daily energy (kWh) and CO₂ (kg) estimates |
 | `GET /api/models` | — | Per-model token/cost/error breakdown |
 | `GET /api/tools` | — | Per-tool call counts, latency, success rates |
 | `GET /api/decisions` | — | Code edit accept/reject by tool+language |
@@ -84,17 +88,19 @@ REST endpoints are polled by React Query components. SSE `/api/live` is consumed
 
 ### Frontend (`frontend/src/`)
 
-- **`App.tsx`** — root layout; section order: OverviewCards → DailyChart+LiveFeed → InsightsRow → ModelBreakdown → ToolTable+EditDecisions → ErrorPanel+SessionTable.
+- **`App.tsx`** — root layout with `DashboardProvider` context and unified toolbar; section order: OverviewCards → DailyChart+LiveFeed → InsightsRow → EnvironmentalImpact → ModelBreakdown → ToolTable+EditDecisions → ErrorPanel+SessionTable.
 - **`lib/format.ts`** — formatting utilities: `fmtCompact`, `fmtCurrency`, `fmtPercent`, `fmtDurationMs`, `fmtDurationSeconds`, `shortDate`, `shortId`.
 - **`lib/pricing.ts`** — `MODEL_PRICING` constants (input/cache_read prices per million tokens). Used to compute `cache_savings_usd` in OverviewCards and ModelBreakdown.
+- **`lib/DashboardContext.tsx`** — shared React context for period (today/week/month) and interval state; consumed by OverviewCards and DailyChart; the unified toolbar in App.tsx drives both.
 - **`hooks/useLiveFeed.ts`** — manages the `EventSource` connection to `/api/live`, reconnects on error (3 s back-off), keeps last 100 events.
 
 **Components:**
 
 | Component | Data source | Notes |
 |---|---|---|
-| `OverviewCards` | `/api/overview` + `/api/daily?days=14` | 6 KPI cards + 4 efficiency cards (cost/commit, cost/line, cache savings, burn rate) |
-| `DailyChart` | `/api/daily` or `/api/hourly` | Day/Week toggle; 3 sub-charts: tokens/cost, activity, efficiency |
+| `OverviewCards` | `/api/overview` + `/api/daily?days=60` + `/api/environmental?days=60` | 6 KPI cards + 5 efficiency cards (cost/commit, cost/line, cache savings, burn rate, tree-days); period from shared `DashboardContext` |
+| `DailyChart` | `/api/interval` | Interval from shared `DashboardContext`; 3 sub-charts: tokens/cost, activity, efficiency |
+| `EnvironmentalImpact` | `/api/environmental?days=30` | CO₂ ring gauge, energy stats, equivalence cards, sparkline, cache savings badge |
 | `InsightsRow` | — | Grid wrapper for SessionScatter + DowHeatmap |
 | `SessionScatter` | `/api/sessions?limit=100` | ScatterChart: cost vs duration, dot size=lines, color=shipped/exploration |
 | `DowHeatmap` | `/api/patterns` | Custom 7-cell heatmap by day of week (amber=cost, emerald=lines) |
@@ -142,4 +148,4 @@ Note: `session.id` arrives as an OTel **resource attribute** and is merged into 
 
 ### Vite proxy (dev only)
 
-Vite proxies `/api/*` and `/v1/*` to `http://localhost:8000`. Configured in `frontend/vite.config.ts`. Not needed in production (Docker serves everything from one process on port 6767).
+Vite proxies `/api/*` and `/v1/*` to `http://localhost:6767`. Configured in `frontend/vite.config.ts`. Not needed in production (Docker serves everything from one process on port 6767).

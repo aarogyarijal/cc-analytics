@@ -10,8 +10,10 @@ A personal telemetry dashboard for [Claude Code](https://claude.ai/code). Collec
 
 - [Features](#features)
   - [Overview KPIs](#overview-kpis)
+  - [Unified Toolbar](#unified-toolbar)
   - [Usage Trend Chart](#usage-trend-chart)
   - [Live Feed](#live-feed)
+  - [Environmental Impact](#environmental-impact)
   - [Sessions — Cost vs. Output](#sessions--cost-vs-output)
   - [Day-of-Week Heatmap](#day-of-week-heatmap)
   - [Model Breakdown](#model-breakdown)
@@ -50,13 +52,13 @@ A personal telemetry dashboard for [Claude Code](https://claude.ai/code). Collec
 
 ### Overview KPIs
 
-Ten live cards with a **Today / Week / Month** toggle.
+Eleven live cards driven by the unified toolbar's **Today / Week / Month** period.
 
-Primary metrics:
+Primary metrics (top row):
 
 | Card | What it shows |
 |---|---|
-| **Cost** | Spend for the period + all-time total + day-over-day delta |
+| **Cost** | Spend for the period + all-time total + period-over-period delta |
 | **Tokens** | Input + output breakdown |
 | **Lines** | Lines added and removed by Claude |
 | **Time** | Typing time vs CLI active time |
@@ -71,10 +73,21 @@ Efficiency row:
 | **Cost / Line** | Total spend ÷ lines of code written |
 | **Cache Savings** | USD saved vs paying full input price for cached tokens |
 | **Burn Rate** | $/hr while actively working |
+| **Tree-Days** | CO₂ emitted expressed as tree-absorption-days (22 kg CO₂/tree/year) |
+
+### Unified Toolbar
+
+A single control bar in the header drives both the overview cards and the usage chart. Left side selects the **time range** (Today / Week / Month), right side selects the **chart interval** (bucket size). Available intervals change based on the selected range:
+
+| Range | Available intervals |
+|---|---|
+| Today | 15m, 30m, 1h |
+| Week | 1h, 2h, 5h |
+| Month | 5h, 12h, 24h |
 
 ### Usage Trend Chart
 
-Stacked area + line chart with a flexible **interval dropdown** (15 min, 30 min, 1 h, 6 h, 12 h, 24 h, daily). Three stacked sub-charts:
+Stacked area + line chart with interval buttons in the unified toolbar. Three stacked sub-charts:
 
 1. **Tokens / cost** — cache creation, cache read, input tokens, output tokens, cost overlay
 2. **Activity** — API requests, tool calls, lines changed, API errors
@@ -94,6 +107,18 @@ Real-time SSE stream rendered as a scrolling list beside the trend chart. Every 
 - `METRIC` — metric name and delta value
 
 Keeps the last 100 events in memory. Reconnects automatically with a 3 s back-off.
+
+### Environmental Impact
+
+Interactive carbon footprint tracker estimating the energy and CO₂ cost of your Claude Code usage. Based on LLM inference energy research (Luccioni et al. 2023) and EPA 2023 US grid intensity (0.386 kg CO₂/kWh).
+
+Features:
+- **Animated ring gauge** — 270° SVG arc that fills based on CO₂ relative to a per-period calibrated max, with color transitions from emerald to amber to orange
+- **Count-up animation** — smooth requestAnimationFrame-based value transitions on period change
+- **Period toggle** — Today / Week / Month with independent data slicing
+- **Equivalence cards** — translates CO₂ into relatable units: smartphone charges, km driven, LED bulb hours, tree-absorption days
+- **Cache savings badge** — shows CO₂ saved by prompt caching (cache reads use ~100x less energy than full inference)
+- **Sparkline** — daily CO₂ trend via Recharts AreaChart
 
 ### Sessions — Cost vs. Output
 
@@ -274,6 +299,7 @@ JSON label values are queried with SQLite's `json_extract`, e.g. `json_extract(l
 | `GET` | `/api/decisions` | — | Code edit accept/reject by tool + language |
 | `GET` | `/api/sessions` | `limit` (1–500, default 50) | Per-session metrics, newest first |
 | `GET` | `/api/errors` | `limit` (1–100, default 25) | API errors grouped by model + status code |
+| `GET` | `/api/environmental` | `days` (1–365, default 30) | Daily energy (kWh) and CO₂ (kg) estimates from token usage |
 | `GET` | `/api/patterns` | — | Day-of-week productivity averages (0=Sun … 6=Sat) |
 | `GET` | `/api/live` | — | SSE stream — one event per telemetry record received |
 
@@ -283,8 +309,9 @@ All components are in `frontend/src/components/`. Data fetching uses TanStack Qu
 
 | Component | Data source | Notes |
 |---|---|---|
-| `OverviewCards` | `/api/overview` + `/api/daily?days=14` | Today/Week/Month toggle; 10 KPI cards |
-| `DailyChart` | `/api/daily`, `/api/hourly`, `/api/interval` | Interval dropdown; tokens/cost, activity, efficiency sub-charts |
+| `OverviewCards` | `/api/overview` + `/api/daily?days=60` + `/api/environmental?days=60` | 11 KPI cards (6 primary + 5 efficiency); period from unified toolbar |
+| `DailyChart` | `/api/interval` | Interval from unified toolbar; tokens/cost, activity, efficiency sub-charts |
+| `EnvironmentalImpact` | `/api/environmental?days=30` | Ring gauge, equivalence cards, sparkline, cache savings badge |
 | `LiveFeed` | SSE `/api/live` | Real-time event stream; last 100 events |
 | `SessionScatter` | `/api/sessions?limit=100` | Scatter: cost vs duration, dot size = lines |
 | `DowHeatmap` | `/api/patterns` | 7-cell heatmap; amber = cost, emerald = lines |
@@ -299,6 +326,7 @@ Supporting utilities:
 | File | Purpose |
 |---|---|
 | `hooks/useLiveFeed.ts` | Manages `EventSource` connection, 3 s reconnect back-off, last-100 ring buffer |
+| `lib/DashboardContext.tsx` | Shared React context for period + interval state; drives OverviewCards and DailyChart from the unified toolbar |
 | `lib/format.ts` | `fmtCompact`, `fmtCurrency`, `fmtPercent`, `fmtDurationMs`, `fmtDurationSeconds`, `shortDate`, `shortId` |
 | `lib/pricing.ts` | `MODEL_PRICING` dict ($/M tokens), `calculateCacheSavings()` |
 
@@ -317,6 +345,9 @@ These fields are derived at query time rather than stored directly.
 | `tool_saturation` | `SessionTable` | `tool_calls / api_calls` — tool use density per request |
 | `burn_rate` | `SessionTable` | `cost_usd / (active_time_s / 3600)` |
 | `bottleneck_score` | `ToolTable` | `p95_duration_ms / avg_duration_ms` — spike sensitivity |
+| `co2_kg` | `db.py` | `energy_kwh × 0.386` (US EPA 2023 grid intensity) |
+| `energy_kwh` | `db.py` | Sum of `tokens × kWh_per_million_tokens` by token type |
+| `tree_days` | `OverviewCards` | `co2_kg / (22 / 365)` — days for one tree to absorb equivalent CO₂ |
 
 ---
 
@@ -332,7 +363,7 @@ These fields are derived at query time rather than stored directly.
 ### Install
 
 ```bash
-git clone https://github.com/your-username/cc-analytics
+git clone https://github.com/aarogyarijal/cc-analytics
 cd cc-analytics
 make install
 ```
@@ -466,19 +497,25 @@ cc-analytics/
 │   ├── main.py              # FastAPI app, OTLP receivers, REST + SSE
 │   ├── db.py                # SQLite layer, all queries, MODEL_PRICING
 │   ├── otlp.py              # OTel attribute parsing helpers
-│   ├── requirements.txt     # fastapi, uvicorn[standard], aiosqlite
-│   └── analytics.db         # SQLite database file
+│   └── requirements.txt     # fastapi, uvicorn[standard], aiosqlite
 ├── frontend/
+│   ├── index.html            # HTML entry point with meta tags + favicon
+│   ├── public/
+│   │   └── favicon.svg       # Claude lightning bolt icon
 │   ├── src/
-│   │   ├── App.tsx           # Root layout, QueryClientProvider
-│   │   ├── components/       # 10 dashboard components
+│   │   ├── App.tsx           # Root layout, DashboardProvider, unified toolbar
+│   │   ├── components/       # 11 dashboard components
 │   │   ├── hooks/
 │   │   │   └── useLiveFeed.ts
 │   │   └── lib/
+│   │       ├── DashboardContext.tsx  # Shared period + interval state
 │   │       ├── format.ts     # Formatting utilities
 │   │       └── pricing.ts    # Model pricing constants
 │   ├── vite.config.ts        # Dev proxy: /api/* → :6767
 │   └── package.json
+├── tests/
+│   └── environmental.spec.ts # Playwright tests for EnvironmentalImpact
+├── playwright.config.ts
 ├── Dockerfile                # Multi-stage: Node build → Python runtime
 ├── docker-compose.yml
 ├── Makefile
