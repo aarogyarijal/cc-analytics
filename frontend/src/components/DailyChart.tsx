@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   ComposedChart,
@@ -14,6 +13,7 @@ import {
   AreaChart,
 } from "recharts";
 import { fmtCompact, fmtCurrency, fmtPercent } from "../lib/format";
+import { useDashboard } from "../lib/DashboardContext";
 
 type HourlyRow = {
   hour: string;
@@ -33,22 +33,6 @@ type EnhancedRow = HourlyRow & {
   lines_per_hour: number;
 };
 
-type IntervalOption = {
-  label: string;
-  interval_hours: number;
-  total_hours: number;
-};
-
-const INTERVAL_OPTIONS: IntervalOption[] = [
-  { label: "15 min · 24h",  interval_hours: 0.25, total_hours: 24  },
-  { label: "30 min · 24h",  interval_hours: 0.5,  total_hours: 24  },
-  { label: "1 hr · 48h",    interval_hours: 1,    total_hours: 48  },
-  { label: "2 hr · 3d",     interval_hours: 2,    total_hours: 72  },
-  { label: "5 hr · 7d",     interval_hours: 5,    total_hours: 168 },
-  { label: "12 hr · 14d",   interval_hours: 12,   total_hours: 336 },
-  { label: "24 hr · 30d",   interval_hours: 24,   total_hours: 720 },
-];
-
 function StatChip({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
@@ -64,8 +48,7 @@ function formatHourLabel(hour: string): string {
 }
 
 export default function DailyChart() {
-  const [optionIdx, setOptionIdx] = useState(1); // default: 30 min · 24h
-  const opt = INTERVAL_OPTIONS[optionIdx];
+  const { currentInterval: opt } = useDashboard();
 
   const { data: rawData = [] } = useQuery<HourlyRow[]>({
     queryKey: ["interval", opt.interval_hours, opt.total_hours],
@@ -109,17 +92,6 @@ export default function DailyChart() {
           <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Trend</p>
           <h2 className="mt-1 text-lg font-semibold text-slate-50">Usage</h2>
         </div>
-        <select
-          value={optionIdx}
-          onChange={(e) => setOptionIdx(Number(e.target.value))}
-          className="rounded-lg border border-white/10 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-200 focus:outline-none focus:ring-1 focus:ring-white/20"
-        >
-          {INTERVAL_OPTIONS.map((o, i) => (
-            <option key={i} value={i}>
-              {o.label}
-            </option>
-          ))}
-        </select>
         <div className="flex flex-wrap gap-2">
           <StatChip label="Cost" value={fmtCurrency(totals.cost, 2)} />
           <StatChip label="Tokens" value={fmtCompact(totals.tokens)} />
@@ -136,8 +108,8 @@ export default function DailyChart() {
               <ComposedChart data={data as any} margin={{ top: 6, right: 16, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
                 <XAxis dataKey="hour" tickFormatter={formatHourLabel} tick={{ fontSize: 11, fill: "#94a3b8" }} />
-                <YAxis yAxisId="tokens" tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={(v) => fmtCompact(Number(v))} />
-                <YAxis yAxisId="cost" orientation="right" tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={(v) => fmtCurrency(Number(v), 2)} />
+                <YAxis yAxisId="tokens" tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={(v) => fmtCompact(Number(v))} label={{ value: "Tokens", angle: -90, position: "insideLeft", style: { fill: "#64748b", fontSize: 10 } }} />
+                <YAxis yAxisId="cost" orientation="right" tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={(v) => fmtCurrency(Number(v), 2)} label={{ value: "Cost ($)", angle: 90, position: "insideRight", style: { fill: "#64748b", fontSize: 10 } }} />
                 <Tooltip
                   contentStyle={{ background: "rgba(2,6,23,0.95)", border: "1px solid rgba(148,163,184,0.18)", borderRadius: "12px", color: "#e2e8f0" }}
                   labelFormatter={(label) => formatHourLabel(String(label))}
@@ -184,8 +156,8 @@ export default function DailyChart() {
             <ComposedChart data={data as any} margin={{ top: 6, right: 16, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
               <XAxis dataKey="hour" tickFormatter={formatHourLabel} tick={{ fontSize: 11, fill: "#94a3b8" }} />
-              <YAxis yAxisId="efficiency" tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={(v) => fmtCurrency(Number(v), 2)} />
-              <YAxis yAxisId="productivity" orientation="right" tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={(v) => `${fmtCompact(Number(v))}/hr`} />
+              <YAxis yAxisId="efficiency" tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={(v) => fmtCurrency(Number(v), 2)} label={{ value: "$/Line", angle: -90, position: "insideLeft", style: { fill: "#64748b", fontSize: 10 } }} />
+              <YAxis yAxisId="productivity" orientation="right" tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={(v) => `${fmtCompact(Number(v))}/hr`} label={{ value: "Lines/Hr", angle: 90, position: "insideRight", style: { fill: "#64748b", fontSize: 10 } }} />
               <Tooltip
                 contentStyle={{ background: "rgba(2,6,23,0.95)", border: "1px solid rgba(148,163,184,0.18)", borderRadius: "12px", color: "#e2e8f0" }}
                 formatter={(value, name) => {
