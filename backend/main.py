@@ -111,8 +111,11 @@ def get_decisions():
 
 
 @app.get("/api/sessions")
-def get_sessions(limit: int = Query(default=50, ge=1, le=500)):
-    return db.query_sessions(limit)
+def get_sessions(
+    limit: int = Query(default=50, ge=1, le=500),
+    since_hours: int = Query(default=168, ge=1, le=8760),
+):
+    return db.query_sessions(limit, since_hours)
 
 
 @app.get("/api/errors")
@@ -123,6 +126,16 @@ def get_errors(limit: int = Query(default=25, ge=1, le=100)):
 @app.get("/api/patterns")
 def get_patterns():
     return db.query_dow_patterns()
+
+
+@app.get("/api/environmental")
+def get_environmental(days: int = Query(default=30, ge=1, le=365)):
+    return db.query_environmental(days)
+
+
+@app.get("/api/session-events")
+def get_session_events(session_id: str = Query(...), limit: int = Query(default=200, ge=1, le=1000)):
+    return db.query_session_events(session_id, limit)
 
 
 @app.get("/api/hourly")

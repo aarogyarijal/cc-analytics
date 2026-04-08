@@ -617,7 +617,8 @@ def query_decisions() -> list[dict]:
     ]
 
 
-def query_sessions(limit: int = 50) -> list[dict]:
+def query_sessions(limit: int = 50, since_hours: int = 168) -> list[dict]:
+    cutoff_ms = int((time.time() - since_hours * 3600) * 1000)
     with conn_ctx() as conn:
         rows = conn.execute(
             """
@@ -633,6 +634,7 @@ def query_sessions(limit: int = 50) -> list[dict]:
               FROM events
               WHERE session_id IS NOT NULL
               GROUP BY session_id
+              HAVING MAX(ts) >= ?
             ),
             session_metrics AS (
               SELECT json_extract(labels,'$."session.id"') AS session_id,
@@ -676,7 +678,7 @@ def query_sessions(limit: int = 50) -> list[dict]:
             ORDER BY e.start_ts DESC
             LIMIT ?
             """,
-            (limit,),
+            (cutoff_ms, limit),
         ).fetchall()
 
     result = []
@@ -748,6 +750,78 @@ def query_errors(limit: int = 25) -> list[dict]:
         }
         for r in rows
     ]
+
+
+def query_environmental(days: int = 30) -> list[dict]:
+    """Return per-day energy and CO₂ estimates for the last N days.
+
+    Energy estimates are derived from token counts using published research on
+    LLM inference costs (Luccioni et al., 2023 "Power Hungry Processing").
+    Anthropic's actual infrastructure figures are not publicly available.
+    CO₂ uses the US average grid intensity (EPA 2023: 0.386 kg CO₂/kWh).
+    """
+    # kWh per million tokens — by token type.
+    # Derived from: Luccioni et al. (2023) "Power Hungry Processing" and
+    # independent estimates for large-scale transformer inference (~70B+ params).
+    # Cache reads are DRAM bandwidth, not compute; estimated ~100× cheaper than
+    # a full prefill pass. These are order-of-magnitude estimates.
+    ENERGY_PER_MTOK = {
+        "input":         0.01,    # ~10 Wh/million tokens (prefill)
+        "output":        0.03,    # ~30 Wh/million tokens (autoregressive, ~3× prefill)
+        "cacheRead":     0.0001,  # ~0.1 Wh/million tokens (memory read only)
+        "cacheCreation": 0.01,    # same cost as input prefill
+    }
+    CO2_KG_PER_KWH = 0.386   # US average (EPA 2023)
+
+    since = _days_ago_midnight_ms(days)
+    with conn_ctx() as conn:
+        token_rows = conn.execute(
+            """
+            SELECT date(ts/1000,'unixepoch','localtime') AS date,
+                   json_extract(labels,'$.type') AS type,
+                   SUM(value) AS total
+            FROM metrics
+            WHERE name='claude_code.token.usage' AND ts >= ?
+            GROUP BY date, type
+            ORDER BY date
+            """,
+            (since,),
+        ).fetchall()
+
+    by_date: dict[str, dict] = {}
+    for r in token_rows:
+        d = by_date.setdefault(r["date"], {
+            "date": r["date"],
+            "input_tokens": 0, "output_tokens": 0,
+            "cache_read_tokens": 0, "cache_creation_tokens": 0,
+        })
+        key = {
+            "input": "input_tokens", "output": "output_tokens",
+            "cacheRead": "cache_read_tokens", "cacheCreation": "cache_creation_tokens",
+        }.get(r["type"])
+        if key:
+            d[key] += r["total"] or 0
+
+    results = []
+    for row in sorted(by_date.values(), key=lambda x: x["date"]):
+        input_e  = row["input_tokens"]          / 1e6 * ENERGY_PER_MTOK["input"]
+        output_e = row["output_tokens"]         / 1e6 * ENERGY_PER_MTOK["output"]
+        cache_r  = row["cache_read_tokens"]     / 1e6 * ENERGY_PER_MTOK["cacheRead"]
+        cache_c  = row["cache_creation_tokens"] / 1e6 * ENERGY_PER_MTOK["cacheCreation"]
+        total_e  = input_e + output_e + cache_r + cache_c
+        # Saved: difference between if cache reads were full input cost
+        saved_e  = row["cache_read_tokens"] / 1e6 * (ENERGY_PER_MTOK["input"] - ENERGY_PER_MTOK["cacheRead"])
+        results.append({
+            "date":              row["date"],
+            "energy_kwh":        round(total_e, 6),
+            "co2_kg":            round(total_e * CO2_KG_PER_KWH, 6),
+            "cache_saved_kwh":   round(saved_e, 6),
+            "cache_saved_co2_kg": round(saved_e * CO2_KG_PER_KWH, 6),
+            "input_tokens":      row["input_tokens"],
+            "output_tokens":     row["output_tokens"],
+            "cache_read_tokens": row["cache_read_tokens"],
+        })
+    return results
 
 
 def query_hourly(hours: int = 24) -> list[dict]:
@@ -1211,3 +1285,28 @@ def query_dow_patterns() -> list[dict]:
             "avg_api_requests": int(r["avg_api_requests"] or 0),
         })
     return sorted(result, key=lambda x: x["dow"])
+
+
+def query_session_events(session_id: str, limit: int = 200) -> list[dict]:
+    """Return chronological events for a single session."""
+    with conn_ctx() as conn:
+        rows = conn.execute(
+            """
+            SELECT ts, event_name, attrs
+            FROM events
+            WHERE session_id = ?
+            ORDER BY ts ASC
+            LIMIT ?
+            """,
+            (session_id, limit),
+        ).fetchall()
+
+    result = []
+    for r in rows:
+        attrs = json.loads(r["attrs"]) if r["attrs"] else {}
+        result.append({
+            "ts": r["ts"],
+            "event_name": r["event_name"],
+            "attrs": attrs,
+        })
+    return result
