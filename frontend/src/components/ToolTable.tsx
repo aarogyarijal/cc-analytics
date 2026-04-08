@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Treemap, ResponsiveContainer } from "recharts";
 import { useLiveFeed } from "../hooks/useLiveFeed";
 import { fmtCompact, fmtDurationMs, fmtPercent, fmtDurationSeconds } from "../lib/format";
@@ -19,10 +19,14 @@ type SortKey = keyof ToolRow;
 export default function ToolTable() {
   const qc = useQueryClient();
   const { events } = useLiveFeed();
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     if (events[0]?.type === "tool_result") {
-      qc.invalidateQueries({ queryKey: ["tools"] });
+      clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        qc.invalidateQueries({ queryKey: ["tools"] });
+      }, 5000);
     }
   }, [events, qc]);
 

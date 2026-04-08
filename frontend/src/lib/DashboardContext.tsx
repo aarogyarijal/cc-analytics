@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 
 export type Period = "today" | "week" | "month";
 
@@ -50,13 +50,18 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const intervals = INTERVALS_BY_PERIOD[period];
   const currentInterval = intervals[intervalIdx] ?? intervals[0];
 
-  function setPeriod(p: Period) {
+  const setPeriod = useCallback((p: Period) => {
     setPeriodRaw(p);
     setIntervalIdx(DEFAULT_INTERVAL_IDX[p]);
-  }
+  }, []);
+
+  const value = useMemo(
+    () => ({ period, setPeriod, intervalIdx, setIntervalIdx, intervals, currentInterval }),
+    [period, setPeriod, intervalIdx, intervals, currentInterval],
+  );
 
   return (
-    <DashboardContext.Provider value={{ period, setPeriod, intervalIdx, setIntervalIdx, intervals, currentInterval }}>
+    <DashboardContext.Provider value={value}>
       {children}
     </DashboardContext.Provider>
   );

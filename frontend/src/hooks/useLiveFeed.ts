@@ -15,6 +15,7 @@ export function useLiveFeed() {
   const [events, setEvents] = useState<LiveEvent[]>([]);
   const [connected, setConnected] = useState(false);
   const esRef = useRef<EventSource | null>(null);
+  const reconnectRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     function connect() {
@@ -25,7 +26,8 @@ export function useLiveFeed() {
       es.onerror = () => {
         setConnected(false);
         es.close();
-        setTimeout(connect, 3000);
+        clearTimeout(reconnectRef.current);
+        reconnectRef.current = setTimeout(connect, 3000);
       };
 
       const eventTypes = [
@@ -52,6 +54,7 @@ export function useLiveFeed() {
 
     connect();
     return () => {
+      clearTimeout(reconnectRef.current);
       esRef.current?.close();
     };
   }, []);
