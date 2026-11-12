@@ -5,7 +5,8 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "127.0.0.1:6767:6767"
+      # Default: local only. On a remote/Tailscale host set CC_BIND=0.0.0.0 in .env
+      - "${CC_BIND:-127.0.0.1}:6767:6767"
     environment:
       CC_ANALYTICS_DB_PATH: /data/analytics.db
       PORT: "6767"
